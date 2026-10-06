@@ -1024,7 +1024,7 @@ static int compat_mtp_send_event(struct mtp_dev *dev, struct compat_mtp_event *e
 	int length = event->length;
 	unsigned long data = event->data;
 
-	DBG(dev->cdev, "%s(%zu)\n", __func__, event->length);
+	DBG(dev->cdev, "%s(%zu)\n", __func__, (size_t)event->length);
 
 	if (length < 0 || length > INTR_BUFFER_SIZE)
 		return -EINVAL;
@@ -1056,7 +1056,7 @@ static int mtp_send_event(struct mtp_dev *dev, struct mtp_event *event)
 	int ret;
 	int length = event->length;
 
-	DBG(dev->cdev, "%s(%zu)\n", __func__, event->length);
+	DBG(dev->cdev, "%s(%zu)\n", __func__, (size_t)event->length);
 
 	if (length < 0 || length > INTR_BUFFER_SIZE)
 		return -EINVAL;

@@ -62,6 +62,10 @@
 #include <linux/pid_namespace.h>
 #include <linux/device.h>
 #include <linux/kthread.h>
+#include <linux/fs.h>
+#include <linux/reboot.h>
+#include <linux/kmsg_dump.h>
+#include <linux/mm.h>
 #include <linux/sched.h>
 #include <linux/sched/init.h>
 #include <linux/signal.h>
@@ -138,6 +142,12 @@ static char *initcall_command_line;
 
 static char *execute_command;
 static char *ramdisk_execute_command;
+
+extern void __init qin2pro_fb_mark3(unsigned int n);
+static int qin_wd_thread(void *unused);
+static void qin_wd_early_nodes(void);
+static unsigned int qin2pro_icall_seq __initdata;
+#define QIN_MARK(n) qin2pro_fb_mark3(n)
 
 /*
  * Used to generate warnings if static_key manipulation functions are used
@@ -562,6 +572,7 @@ asmlinkage __visible void __init start_kernel(void)
 	page_address_init();
 	pr_notice("%s", linux_banner);
 	setup_arch(&command_line);
+	QIN_MARK(777);
 	/*
 	 * Set up the the initial canary and entropy after arch
 	 * and after adding latent and command line entropy.
@@ -926,8 +937,10 @@ static void __init do_initcall_level(int level)
 		   level, level,
 		   NULL, &repair_env_string);
 
-	for (fn = initcall_levels[level]; fn < initcall_levels[level+1]; fn++)
+	for (fn = initcall_levels[level]; fn < initcall_levels[level+1]; fn++) {
+		QIN_MARK(++qin2pro_icall_seq);
 		do_one_initcall(*fn);
+	}
 }
 
 static void __init do_initcalls(void)
@@ -960,8 +973,10 @@ static void __init do_pre_smp_initcalls(void)
 {
 	initcall_t *fn;
 
-	for (fn = __initcall_start; fn < __initcall0_start; fn++)
+	for (fn = __initcall_start; fn < __initcall0_start; fn++) {
+		QIN_MARK(++qin2pro_icall_seq);
 		do_one_initcall(*fn);
+	}
 }
 
 /*
@@ -1031,11 +1046,240 @@ static inline void mark_readonly(void)
 }
 #endif
 
+#define QIN_FB_PHYS	0x9d654000UL
+#define QIN_P11_BASE	(1UL * 1024 * 1024)
+#define QIN_WIN		(256 * 1024)
+#define QIN_BUFSZ	(240 * 1024)
+
+static char *qin_wd_buf;
+static size_t qin_wd_buflen;
+
+static void qin_dump_cb(struct kmsg_dumper *d, enum kmsg_dump_reason r)
+{
+	kmsg_dump_get_buffer(d, true, qin_wd_buf, QIN_BUFSZ, &qin_wd_buflen);
+}
+
+static struct kmsg_dumper qin_kd = { .dump = qin_dump_cb };
+
+static void qin_wd_dump_kmsg(unsigned int win)
+{
+	struct file *f;
+	long err_kmsg = 0, err_p11 = 0;
+	char status[96];
+	loff_t wpos = QIN_P11_BASE + win * QIN_WIN;
+	int n;
+
+	qin_wd_buf = (char *)__get_free_pages(GFP_KERNEL, 6);
+	if (!qin_wd_buf)
+		return;
+	qin_wd_buflen = 0;
+
+	f = filp_open("/dev/kmsg", O_RDONLY | O_NONBLOCK, 0);
+	if (IS_ERR(f)) {
+		err_kmsg = PTR_ERR(f);
+	} else {
+		mm_segment_t old;
+		loff_t rpos = 0;
+		ssize_t r;
+
+		old = get_fs();
+		set_fs(KERNEL_DS);
+		while (qin_wd_buflen < QIN_BUFSZ) {
+			r = vfs_read(f, qin_wd_buf + qin_wd_buflen,
+				     QIN_BUFSZ - qin_wd_buflen, &rpos);
+			if (r <= 0) {
+				err_kmsg = r;
+				break;
+			}
+			qin_wd_buflen += r;
+		}
+		set_fs(old);
+		filp_close(f, NULL);
+	}
+
+	if (!qin_wd_buflen) {
+		kmsg_dump_register(&qin_kd);
+		kmsg_dump(KMSG_DUMP_OOPS);
+		kmsg_dump_unregister(&qin_kd);
+	}
+
+	n = snprintf(status, sizeof(status),
+		     "\n=== QINWD win%u kmsg_err=%ld buflen=%u ===\n",
+		     win, err_kmsg, (unsigned)qin_wd_buflen);
+
+	f = filp_open("/dev/block/mmcblk0p11",
+		      O_WRONLY | O_SYNC | O_LARGEFILE, 0);
+	if (IS_ERR(f))
+		f = filp_open("/dev/mmcblk0p11",
+			      O_WRONLY | O_SYNC | O_LARGEFILE, 0);
+	if (IS_ERR(f)) {
+		qin_wd_early_nodes();
+		f = filp_open("/dev/qinp11",
+			      O_WRONLY | O_SYNC | O_LARGEFILE, 0);
+	}
+	if (IS_ERR(f)) {
+		err_p11 = PTR_ERR(f);
+	} else {
+		kernel_write(f, status, n, &wpos);
+		if (qin_wd_buflen)
+			kernel_write(f, qin_wd_buf, qin_wd_buflen, &wpos);
+		vfs_fsync(f, 0);
+		filp_close(f, NULL);
+	}
+
+	free_pages((unsigned long)qin_wd_buf, 6);
+	qin_wd_buf = NULL;
+}
+
+/* create block-dev nodes directly in the ramfs rootfs so kmsg dumps to
+ * p11 work even before devtmpfs is mounted (initcall phase). */
+static int qin_wd_early_nodes_done;
+
+static void qin_wd_early_nodes(void)
+{
+	mm_segment_t old;
+
+	if (qin_wd_early_nodes_done)
+		return;
+	old = get_fs();
+	set_fs(KERNEL_DS);
+	if (sys_mkdir("/dev", 0755) && sys_mkdir("/dev", 0755)) {
+		/* keep retrying; rootfs may not be ready yet */
+		set_fs(old);
+		return;
+	}
+	sys_mknod("/dev/qinp11", S_IFBLK | 0600, new_decode_dev(MKDEV(179, 11)));
+	sys_mknod("/dev/qinp4", S_IFBLK | 0600, new_decode_dev(MKDEV(179, 4)));
+	set_fs(old);
+	qin_wd_early_nodes_done = 1;
+}
+
+static void qin_wd_heartbeat(unsigned int tick)
+{
+	void *p = memremap(QIN_FB_PHYS + 0x54000, 0x2000, MEMREMAP_WB);
+
+	if (!p)
+		return;
+	memset(p, 0, 0x2000);
+	memset(p, 0xf0, 64 * (tick & 63));
+	__flush_dcache_area(p, 0x2000);
+	memunmap(p);
+}
+static void qin_wd_fb_alert(void)
+{
+	void *p = memremap(QIN_FB_PHYS + 0x58000, 9 * 0x4000, MEMREMAP_WB);
+	if (p) {
+		memset(p, 0xff, 9 * 0x4000);
+		memunmap(p);
+	}
+}
+
+
+static struct file *qin_misc_file;
+
+/* call in process context only; keeps a ready handle for panic-time use */
+static void qin_wd_open_misc(void)
+{
+	struct file *f;
+
+	if (qin_misc_file && !IS_ERR(qin_misc_file))
+		return;
+	f = filp_open("/dev/block/mmcblk0p4", O_WRONLY | O_SYNC | O_LARGEFILE, 0);
+	if (IS_ERR(f))
+		f = filp_open("/dev/mmcblk0p4", O_WRONLY | O_SYNC | O_LARGEFILE, 0);
+	if (IS_ERR(f)) {
+		qin_wd_early_nodes();
+		f = filp_open("/dev/qinp4", O_WRONLY | O_SYNC | O_LARGEFILE, 0);
+	}
+	if (!IS_ERR(f)) {
+		void *p;
+		qin_misc_file = f;
+		p = memremap(QIN_FB_PHYS + 0x5c000, 0x4000, MEMREMAP_WB);
+		if (p) {
+			memset(p, 0xff, 0x4000);
+			__flush_dcache_area(p, 0x4000);
+			memunmap(p);
+		}
+	}
+}
+
+static void qin_wd_write_bcb(void)
+{
+	loff_t pos = 0;
+	static char bcb[64] = "boot-recovery";
+
+	memset(bcb + 13, 0, sizeof(bcb) - 13);
+	memcpy(bcb + 0x20, "recovery\n", 9);
+	if (qin_misc_file && !IS_ERR(qin_misc_file))
+		kernel_write(qin_misc_file, bcb, sizeof(bcb), &pos);
+}
+
+static int qin_panic_notify(struct notifier_block *nb,
+			    unsigned long ev, void *ptr)
+{
+	/* panic context: cannot open files; reuse cached handle */
+	qin_wd_write_bcb();
+	return NOTIFY_DONE;
+}
+
+static int qin_reboot_notify(struct notifier_block *nb,
+			     unsigned long ev, void *ptr)
+{
+	/* any orderly reboot syscall -> also request recovery */
+	qin_wd_write_bcb();
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block qin_reboot_nb = {
+	.notifier_call = qin_reboot_notify,
+};
+
+static struct notifier_block qin_panic_nb = {
+	.notifier_call = qin_panic_notify,
+};
+
+static int __init qin_panic_reg(void)
+{
+	atomic_notifier_chain_register(&panic_notifier_list, &qin_panic_nb);
+	register_reboot_notifier(&qin_reboot_nb);
+	return 0;
+}
+early_initcall(qin_panic_reg);
+
+static int qin_wd_thread(void *unused)
+{
+	unsigned int tick = 0;
+
+	for (tick = 1; tick <= 660; tick++) {
+		msleep(300);
+		qin_wd_heartbeat(tick);
+		qin_wd_open_misc();
+		qin_wd_write_bcb();
+		/* userspace signals boot-done by creating /dev/qin_boot_ok */
+		if (sys_access("/dev/qin_boot_ok", 0) == 0) {
+			loff_t zpos = 0;
+			static char zero[64];
+			if (qin_misc_file && !IS_ERR(qin_misc_file))
+				kernel_write(qin_misc_file, zero, sizeof(zero), &zpos);
+			return 0;
+		}
+	}
+	/* ~3.3min without boot-done: BCB already in place; restart */
+	emergency_restart();
+
+	return 0;
+}
+
 static int __ref kernel_init(void *unused)
 {
 	int ret;
 
 	kernel_init_freeable();
+
+
+
+	QIN_MARK(909);
+	kthread_run(qin_wd_thread, NULL, "qin_wd");
 	/* need to finish all async __init code before freeing the memory */
 	async_synchronize_full();
 	ftrace_free_init_mem();
@@ -1093,7 +1337,7 @@ static noinline void __init kernel_init_freeable(void)
 	 */
 	set_mems_allowed(node_states[N_MEMORY]);
 
-	cad_pid = task_pid(current);
+	QIN_MARK(901);
 
 	smp_prepare_cpus(setup_max_cpus);
 
@@ -1101,17 +1345,21 @@ static noinline void __init kernel_init_freeable(void)
 
 	init_mm_internals();
 
+	QIN_MARK(902);
 	do_pre_smp_initcalls();
 	lockup_detector_init();
 
 	smp_init();
 	sched_init_smp();
 
+	QIN_MARK(903);
 	page_alloc_init_late();
 	/* Initialize page ext after all struct pages are initialized. */
 	page_ext_init();
 
 	do_basic_setup();
+
+	QIN_MARK(905);
 
 	test_executor_init();
 
@@ -1131,7 +1379,9 @@ static noinline void __init kernel_init_freeable(void)
 
 	if (sys_access((const char __user *) ramdisk_execute_command, 0) != 0) {
 		ramdisk_execute_command = NULL;
+		QIN_MARK(907);
 		prepare_namespace();
+		QIN_MARK(908);
 	}
 
 	/*

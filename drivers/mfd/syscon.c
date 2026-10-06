@@ -13,6 +13,7 @@
  */
 
 #include <linux/err.h>
+#include <linux/init_task.h>
 #include <linux/hwspinlock.h>
 #include <linux/io.h>
 #include <linux/module.h>
@@ -25,6 +26,7 @@
 #include <linux/regmap.h>
 #include <linux/mfd/syscon.h>
 #include <linux/slab.h>
+#include <linux/kernel.h>
 
 static struct platform_driver syscon_driver;
 
@@ -280,6 +282,9 @@ int syscon_get_args_by_name(struct device_node *np,
 }
 EXPORT_SYMBOL_GPL(syscon_get_args_by_name);
 
+extern void __init qin2pro_fb_mark3(unsigned int n);
+#define SYSMARK(n) do { if (system_state == SYSTEM_BOOTING) qin2pro_fb_mark3(n); } while (0)
+
 static int syscon_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -289,6 +294,7 @@ static int syscon_probe(struct platform_device *pdev)
 	struct resource *res;
 	void __iomem *base;
 
+	SYSMARK(7701);
 	syscon = devm_kzalloc(dev, sizeof(*syscon), GFP_KERNEL);
 	if (!syscon)
 		return -ENOMEM;
@@ -297,6 +303,7 @@ static int syscon_probe(struct platform_device *pdev)
 	if (!res)
 		return -ENOENT;
 
+	SYSMARK(7702);
 	base = devm_ioremap(dev, res->start, resource_size(res));
 	if (!base)
 		return -ENOMEM;
@@ -304,12 +311,14 @@ static int syscon_probe(struct platform_device *pdev)
 	syscon_config.max_register = res->end - res->start - 3;
 	if (pdata)
 		syscon_config.name = pdata->label;
+	SYSMARK(7703);
 	syscon->regmap = devm_regmap_init_mmio(dev, base, &syscon_config);
 	if (IS_ERR(syscon->regmap)) {
 		dev_err(dev, "regmap init failed\n");
 		return PTR_ERR(syscon->regmap);
 	}
 
+	SYSMARK(7704);
 	platform_set_drvdata(pdev, syscon);
 
 	dev_dbg(dev, "regmap %pR registered\n", res);
@@ -332,7 +341,12 @@ static struct platform_driver syscon_driver = {
 
 static int __init syscon_init(void)
 {
-	return platform_driver_register(&syscon_driver);
+	SYSMARK(7700);
+	{
+		int _r = platform_driver_register(&syscon_driver);
+		SYSMARK(7790);
+		return _r;
+	}
 }
 postcore_initcall(syscon_init);
 

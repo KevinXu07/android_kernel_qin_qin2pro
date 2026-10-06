@@ -33,7 +33,7 @@ static inline int sprd_time_sync_fn(struct notifier_block *nb, unsigned long act
 #endif
 
 /* define a notifier_block */
-static struct notifier_block sprd_time_sync_notifier = {
+static struct notifier_block sprd_time_sync_notifier __maybe_unused = {
 	.notifier_call = sprd_time_sync_fn,
 };
 

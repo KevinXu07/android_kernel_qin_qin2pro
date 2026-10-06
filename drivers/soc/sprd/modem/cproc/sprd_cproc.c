@@ -211,8 +211,8 @@ static ssize_t sprd_cproc_seg_dump(u32 base,
 				start_addr + CPROC_VMALLOC_SIZE_LIMIT * loop,
 				CPROC_VMALLOC_SIZE_LIMIT);
 		if (!vmem) {
-			pr_err("unable to map cproc base: 0x%08x\n",
-			       start_addr + CPROC_VMALLOC_SIZE_LIMIT * loop);
+			pr_err("unable to map cproc base: 0x%016llx\n",
+			       (unsigned long long)(start_addr + CPROC_VMALLOC_SIZE_LIMIT * loop));
 			if (loop > 0)
 				return CPROC_VMALLOC_SIZE_LIMIT * loop;
 			else
@@ -436,7 +436,7 @@ static ssize_t cproc_proc_read(struct file *filp,
 				break;
 
 			memset(&lnode, 0, sizeof(lnode));
-			dev_dbg(dev, "segm[%d] name=%s base=0x%x,size=0x%0x\n",
+			dev_dbg(dev, "segm[%zd] name=%s base=0x%x,size=0x%0x\n",
 				i, segm->name,
 				segm->base,
 				segm->maxsz);
@@ -537,7 +537,7 @@ static ssize_t cproc_proc_read(struct file *filp,
 			pr_info("cproc: read, wait interrupted error!\n");
 			return rval;
 		}
-		pr_info("cproc: cproc->phy_addr= 0x%x \n", cproc->phy_addr);
+		pr_info("cproc: cproc->phy_addr= 0x%pa \n", &cproc->phy_addr);
 		cproc->virt_addr = memremap((resource_size_t)(cproc->phy_addr),
 					    0x400, MEMREMAP_WB);
 		if (!(cproc->virt_addr))

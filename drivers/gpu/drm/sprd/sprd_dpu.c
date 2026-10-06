@@ -275,7 +275,7 @@ static void sprd_plane_atomic_update(struct drm_plane *plane,
 	layer->format = fb->format->format;
 	layer->alpha = s->alpha;
 	layer->blending = s->blend_mode;
-	layer->xfbc = fb->modifier;
+	layer->xfbc = 0;
 	layer->header_size_r = s->fbc_hsize_r;
 	layer->header_size_y = s->fbc_hsize_y;
 	layer->header_size_uv = s->fbc_hsize_uv;
@@ -392,9 +392,11 @@ static int sprd_plane_atomic_set_property(struct drm_plane *plane,
 	DRM_DEBUG("%s() name = %s, val = %llu\n",
 		  __func__, property->name, val);
 
-	if (property == p->alpha_property)
-		s->alpha = val;
-	else if (property == p->blend_mode_property)
+	if (property == p->alpha_property ||
+	    !strcmp(property->name, "alpha"))
+		s->alpha = val >> 8;
+	else if (property == p->blend_mode_property ||
+	    !strcmp(property->name, "pixel blend mode"))
 		s->blend_mode = val;
 	else if (property == p->fbc_hsize_r_property)
 		s->fbc_hsize_r = val;
@@ -428,9 +430,11 @@ static int sprd_plane_atomic_get_property(struct drm_plane *plane,
 
 	DRM_DEBUG("%s() name = %s\n", __func__, property->name);
 
-	if (property == p->alpha_property)
-		*val = s->alpha;
-	else if (property == p->blend_mode_property)
+	if (property == p->alpha_property ||
+	    !strcmp(property->name, "alpha"))
+		*val = s->alpha * 257;
+	else if (property == p->blend_mode_property ||
+	    !strcmp(property->name, "pixel blend mode"))
 		*val = s->blend_mode;
 	else if (property == p->fbc_hsize_r_property)
 		*val = s->fbc_hsize_r;
@@ -473,10 +477,10 @@ static int sprd_plane_create_properties(struct sprd_plane *p, int index)
 	drm_plane_create_zpos_immutable_property(&p->plane, index);
 
 	/* create layer alpha property */
-	prop = drm_property_create_range(p->plane.dev, 0, "alpha", 0, 255);
+	prop = drm_property_create_range(p->plane.dev, 0, "alpha", 0, 0xffff);
 	if (!prop)
 		return -ENOMEM;
-	drm_object_attach_property(&p->plane.base, prop, 255);
+	drm_object_attach_property(&p->plane.base, prop, 0xffff);
 	p->alpha_property = prop;
 
 	/* create blend mode property */
@@ -671,6 +675,7 @@ void sprd_dpu_resume(struct sprd_dpu *dpu)
 	sprd_dpu_init(dpu);
 	enable_irq(dpu->ctx.irq);
 	sprd_iommu_restore(&dpu->dev);
+	drm_crtc_vblank_on(&dpu->crtc);
 	DRM_INFO("dpu resume OK\n");
 }
 
@@ -938,6 +943,7 @@ int sprd_dpu_run(struct sprd_dpu *dpu)
 
 	if (!ctx->is_stopped) {
 		up(&ctx->refresh_lock);
+		drm_crtc_vblank_on(&dpu->crtc);
 		return 0;
 	}
 
@@ -1065,8 +1071,9 @@ static irqreturn_t sprd_dpu_isr(int irq, void *data)
 	if (int_mask & DISPC_INT_ERR_MASK)
 		DRM_WARN("Warning: dpu underflow!\n");
 
-	if ((int_mask & DISPC_INT_DPI_VSYNC_MASK) && ctx->is_inited)
+	if ((int_mask & DISPC_INT_DPI_VSYNC_MASK) && ctx->is_inited) {
 		drm_crtc_handle_vblank(&dpu->crtc);
+	}
 
 	return IRQ_HANDLED;
 }

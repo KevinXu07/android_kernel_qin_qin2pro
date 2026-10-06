@@ -455,7 +455,7 @@ static int sprd_hsphy_probe(struct platform_device *pdev)
 
 	if (boot_cali) {
 		phy->vdd_vol = FULLSPEED_USB33_TUNE;
-		dev_info(dev, "calimode vdd_vol:%d chipid:0x%x\n", phy->vdd_vol);
+		dev_info(dev, "calimode vdd_vol:%d\n", phy->vdd_vol);
 	}
 
 	phy->vdd = devm_regulator_get(dev, "vdd");

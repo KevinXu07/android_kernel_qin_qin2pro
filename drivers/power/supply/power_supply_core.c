@@ -644,7 +644,8 @@ int power_supply_get_battery_info(struct power_supply *psy,
 
 	propname = kasprintf(GFP_KERNEL, "battery_name-%d", battery_id);
 	of_property_read_string(battery_np, propname,	&info->battery_name);
-	strncpy(battery_vendor_name,info->battery_name,32);
+	if (info->battery_name)
+		strncpy(battery_vendor_name, info->battery_name, 32);
 	dev_err(&psy->dev, "%s ;%s;\n", __func__,info->battery_name);
 
 	of_property_read_u32(battery_np, "energy-full-design-microwatt-hours",

@@ -19,6 +19,7 @@
 #include <linux/of_address.h>
 #include <linux/of_irq.h>
 #include <linux/of_graph.h>
+#include <drm/drm_fb_cma_helper.h>
 #include <linux/of_platform.h>
 #include <linux/pm_runtime.h>
 #include <video/mipi_display.h>
@@ -444,6 +445,16 @@ static int sprd_dsi_host_attach(struct mipi_dsi_host *host,
 	ret = sprd_dsi_find_panel(dsi);
 	if (ret)
 		return ret;
+
+	DRM_ERROR("QINDBG attach: dsi=%p panel=%p conn.dev=%p inited=%d\n",
+		dsi, dsi->panel, dsi->connector.dev, dsi->fbdev_inited);
+	if (dsi->connector.dev && !dsi->fbdev_inited) {
+		dsi->fbdev_inited = 1;
+		DRM_ERROR("QINDBG fbdev init begin\n");
+		drm_fbdev_cma_init(dsi->connector.dev, 32,
+				   dsi->connector.dev->mode_config.num_connector);
+		DRM_ERROR("QINDBG fbdev init done\n");
+	}
 
 	lcd_node = dsi->panel->dev->of_node;
 

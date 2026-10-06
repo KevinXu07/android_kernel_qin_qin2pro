@@ -234,7 +234,7 @@ static void gnss_hold_cpu(void)
 		ph_addr = base_addr + GNSS_CACHE_FLAG_ADDR_L6;
 	else
 		ph_addr = base_addr + GNSS_CACHE_FLAG_ADDR;
-	GNSSDUMP_INFO("val=%x bs=%x ph=%x\n", value, base_addr, ph_addr);
+	GNSSDUMP_INFO("val=%x bs=%pa ph=%pa\n", value, &base_addr, &ph_addr);
 	gnss_write_data_to_phy_addr(ph_addr, (void *)&value, 4);
 	/* release cpu */
 	gnss_soft_reset_release_cpu(GNSS_CPU_RESET_RELEASE);
@@ -487,7 +487,7 @@ static int gnss_dump_share_memory(u32 len)
 	fs = get_fs();
 	set_fs(KERNEL_DS);
 	base_addr = wcn_get_gnss_base_addr();
-	GNSSDUMP_ERR(" %s base_addr is 0x%x\n", __func__, base_addr);
+	GNSSDUMP_ERR(" %s base_addr is 0x%pa\n", __func__, &base_addr);
 	virt_addr = shmem_ram_vmap_nocache(base_addr, len);
 	if (!virt_addr) {
 		GNSSDUMP_ERR(" %s shmem_ram_vmap_nocache fail\n", __func__);

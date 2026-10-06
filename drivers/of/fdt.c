@@ -33,6 +33,8 @@
 
 #include "of_private.h"
 
+extern void qin2pro_fb_mark(unsigned int, unsigned char);
+
 /*
  * of_fdt_limit_memory - limit the number of regions in the /memory node
  * @limit: maximum entries
@@ -590,6 +592,7 @@ static int __init __reserved_mem_reserve_reg(unsigned long node,
 	int nomap, first = 1;
 
 	prop = of_get_flat_dt_prop(node, "reg", &len);
+	qin2pro_fb_mark(90, 0x90);
 	if (!prop)
 		return -ENOENT;
 
@@ -600,24 +603,26 @@ static int __init __reserved_mem_reserve_reg(unsigned long node,
 	}
 
 	nomap = of_get_flat_dt_prop(node, "no-map", NULL) != NULL;
+	qin2pro_fb_mark(91, 0x91);
 
 	while (len >= t_len) {
+		static int qin_cell;
 		base = dt_mem_next_cell(dt_root_addr_cells, &prop);
 		size = dt_mem_next_cell(dt_root_size_cells, &prop);
+		qin2pro_fb_mark(60 + qin_cell, 0xa2);
 
-		if (size &&
-		    early_init_dt_reserve_memory_arch(base, size, nomap) == 0)
-			pr_debug("Reserved memory: reserved region for node '%s': base %pa, size %ld MiB\n",
-				uname, &base, (unsigned long)size / SZ_1M);
-		else
-			pr_info("Reserved memory: failed to reserve memory for node '%s': base %pa, size %ld MiB\n",
-				uname, &base, (unsigned long)size / SZ_1M);
+		if (size)
+			early_init_dt_reserve_memory_arch(base, size, nomap);
+		qin2pro_fb_mark(64 + qin_cell, 0xa5);
+		qin2pro_fb_mark(68 + qin_cell, 0xa6);
 
 		len -= t_len;
 		if (first) {
 			fdt_reserved_mem_save_node(node, uname, base, size);
 			first = 0;
 		}
+		qin2pro_fb_mark(80 + qin_cell, 0xa4);
+		qin_cell++;
 	}
 	return 0;
 }
@@ -654,6 +659,7 @@ static int __init __fdt_scan_reserved_mem(unsigned long node, const char *uname,
 	static int found;
 	const char *status;
 	int err;
+	int qin_cur;
 
 	if (!found && depth == 1 && strcmp(uname, "reserved-memory") == 0) {
 		if (__reserved_mem_check_root(node) != 0) {
@@ -672,13 +678,21 @@ static int __init __fdt_scan_reserved_mem(unsigned long node, const char *uname,
 		return 1;
 	}
 
+	{
+		static int qin_idx;
+		qin_cur = qin_idx++;
+		qin2pro_fb_mark(50 + qin_cur * 4, 0x90);
+	}
 	status = of_get_flat_dt_prop(node, "status", NULL);
+	qin2pro_fb_mark(51 + qin_cur * 4, 0xd0);
 	if (status && strcmp(status, "okay") != 0 && strcmp(status, "ok") != 0)
 		return 0;
 
 	err = __reserved_mem_reserve_reg(node, uname);
+	qin2pro_fb_mark(52 + qin_cur * 4, 0xd8);
 	if (err == -ENOENT && of_get_flat_dt_prop(node, "size", NULL))
 		fdt_reserved_mem_save_node(node, uname, 0, 0);
+	qin2pro_fb_mark(53 + qin_cur * 4, 0xe0);
 
 	/* scan next node */
 	return 0;
@@ -707,8 +721,12 @@ void __init early_init_fdt_scan_reserved_mem(void)
 		early_init_dt_reserve_memory_arch(base, size, 0);
 	}
 
-	of_scan_flat_dt(__fdt_scan_reserved_mem, NULL);
-	fdt_init_reserved_mem();
+	{
+		of_scan_flat_dt(__fdt_scan_reserved_mem, NULL);
+		qin2pro_fb_mark(18, 0x74);
+		fdt_init_reserved_mem();
+		qin2pro_fb_mark(19, 0x85);
+	}
 }
 
 /**
@@ -1243,9 +1261,15 @@ int __init __weak early_init_dt_mark_hotplug_memory_arch(u64 base, u64 size)
 int __init __weak early_init_dt_reserve_memory_arch(phys_addr_t base,
 					phys_addr_t size, bool nomap)
 {
+	int r;
+	extern void qin2pro_fb_mark(unsigned int, unsigned char);
+	qin2pro_fb_mark(97, 0xa7);
 	if (nomap)
-		return memblock_remove(base, size);
-	return memblock_reserve(base, size);
+		r = memblock_remove(base, size);
+	else
+		r = memblock_reserve(base, size);
+	qin2pro_fb_mark(98, 0xa8);
+	return r;
 }
 
 /*

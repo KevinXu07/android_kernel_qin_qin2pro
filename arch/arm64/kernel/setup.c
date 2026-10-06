@@ -39,6 +39,7 @@
 #include <linux/proc_fs.h>
 #include <linux/memblock.h>
 #include <linux/of_fdt.h>
+#include <linux/libfdt.h>
 #include <linux/efi.h>
 #include <linux/psci.h>
 #include <linux/sched/task.h>
@@ -62,9 +63,244 @@
 #include <asm/memblock.h>
 #include <asm/efi.h>
 #include <asm/xen/hypervisor.h>
+#include <asm/early_ioremap.h>
+#include <linux/io.h>
+#include <linux/string.h>
 #include <asm/mmu_context.h>
 
 phys_addr_t __fdt_pointer __initdata;
+
+
+/* Qin2 Pro v1: use the source 4.14 board DTB and keep bootloader identity. */
+extern const unsigned char qin2pro_embedded_dtb[];
+static unsigned char qin2pro_fdt_copy[SZ_256K] __aligned(8);
+static bool qin2pro_embedded_selected __initdata;
+static char qin2pro_bootargs[2048] __initdata;
+
+#define QIN2PRO_FB_PHYS		0x9d654000UL
+#define QIN2PRO_FB_PITCH	0x4000
+#define QIN2PRO_FB_FILL		0x2000
+#define QIN2PRO_NUM_HUNS	0x58000UL
+#define QIN2PRO_NUM_TENS	0x80000UL
+#define QIN2PRO_NUM_ONES	0xA8000UL
+#define QIN2PRO_NUM_STRIDE	0x4000
+#define QIN2PRO_NUM_THICK	0x2000
+
+static void __init qin2pro_fb_fill(unsigned long off, unsigned int len,
+				   unsigned char v, int use_early)
+{
+	void *p;
+
+	if (use_early)
+		p = early_memremap(QIN2PRO_FB_PHYS + off, len);
+	else
+		p = memremap(QIN2PRO_FB_PHYS + off, len, MEMREMAP_WB);
+	if (!p)
+		return;
+	memset(p, v, len);
+	__flush_dcache_area(p, len);
+	if (use_early)
+		early_memunmap(p, len);
+	else
+		memunmap(p);
+}
+
+/* Tally readout at fixed fb offsets, always on-screen:
+ * tens cluster = n/10 stripes starting at +0x80000,
+ * ones cluster = n%10 stripes starting at +0xA8000.
+ * e.g. 3 stripes up + 4 stripes down = mark 34. */
+static void __init qin2pro_fb_num(unsigned int n, int use_early)
+{
+	unsigned int i;
+	static bool cleared;
+
+	if (!cleared) {
+		cleared = true;
+		qin2pro_fb_fill(0, 30 * QIN2PRO_FB_PITCH, 0, use_early);
+		qin2pro_fb_fill(QIN2PRO_NUM_HUNS - 0x4000, QIN2PRO_NUM_ONES + 9 * QIN2PRO_NUM_STRIDE + QIN2PRO_NUM_THICK - QIN2PRO_NUM_HUNS + 0x4000, 0, use_early);
+	}
+
+	for (i = 0; i < 9; i++) {
+		qin2pro_fb_fill(QIN2PRO_NUM_TENS + i * QIN2PRO_NUM_STRIDE,
+				QIN2PRO_NUM_THICK, 0, use_early);
+		qin2pro_fb_fill(QIN2PRO_NUM_ONES + i * QIN2PRO_NUM_STRIDE,
+				QIN2PRO_NUM_THICK, 0, use_early);
+	}
+	for (i = 0; i < n / 10 && i < 9; i++)
+		qin2pro_fb_fill(QIN2PRO_NUM_TENS + i * QIN2PRO_NUM_STRIDE,
+				QIN2PRO_NUM_THICK, 0xf0, use_early);
+	for (i = 0; i < n % 10; i++)
+		qin2pro_fb_fill(QIN2PRO_NUM_ONES + i * QIN2PRO_NUM_STRIDE,
+				QIN2PRO_NUM_THICK, 0xf0, use_early);
+}
+
+/* early_memremap works until early_ioremap_reset() */
+void __init qin2pro_fb_mark(unsigned int band, unsigned char value)
+{
+	if (band < 30)
+		qin2pro_fb_fill(band * QIN2PRO_FB_PITCH, QIN2PRO_FB_FILL,
+				value, 1);
+	qin2pro_fb_num(band, 1);
+}
+
+/* post-paging_init: linear map covers all DRAM */
+static void __init qin2pro_fb_mark2(unsigned int band, unsigned char value)
+{
+	if (band < 30)
+		qin2pro_fb_fill(band * QIN2PRO_FB_PITCH, QIN2PRO_FB_FILL,
+				value, 0);
+	qin2pro_fb_num(band, 0);
+}
+/* 3-digit tally for initcall index / late-boot phase codes */
+void __init qin2pro_fb_mark3(unsigned int n)
+{
+	unsigned int i;
+
+	for (i = 0; i < 9; i++) {
+		qin2pro_fb_fill(QIN2PRO_NUM_HUNS + i * QIN2PRO_NUM_STRIDE,
+				QIN2PRO_NUM_THICK, 0, 0);
+		qin2pro_fb_fill(QIN2PRO_NUM_TENS + i * QIN2PRO_NUM_STRIDE,
+				QIN2PRO_NUM_THICK, 0, 0);
+		qin2pro_fb_fill(QIN2PRO_NUM_ONES + i * QIN2PRO_NUM_STRIDE,
+				QIN2PRO_NUM_THICK, 0, 0);
+	}
+	for (i = 0; i < n / 100 && i < 9; i++)
+		qin2pro_fb_fill(QIN2PRO_NUM_HUNS + i * QIN2PRO_NUM_STRIDE,
+				QIN2PRO_NUM_THICK, 0xf0, 0);
+	for (i = 0; i < (n / 10) % 10 && i < 9; i++)
+		qin2pro_fb_fill(QIN2PRO_NUM_TENS + i * QIN2PRO_NUM_STRIDE,
+				QIN2PRO_NUM_THICK, 0xf0, 0);
+	for (i = 0; i < n % 10; i++)
+		qin2pro_fb_fill(QIN2PRO_NUM_ONES + i * QIN2PRO_NUM_STRIDE,
+				QIN2PRO_NUM_THICK, 0xf0, 0);
+}
+
+
+static bool __init qin2pro_runtime_prefix(const char *token, int len)
+{
+	static const char * const prefixes[] = {
+		"androidboot.mode=", "androidboot.serialno=",
+		"androidboot.verifiedbootstate=", "androidboot.flash.locked=",
+		"androidboot.slot_suffix=", "androidboot.bootdevice=",
+		"sysdump_magic=", "modem=", "ltemode=", "rfboard.id=",
+		"rfhw.id=", "crystal=", "32k.less=",
+	};
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(prefixes); i++) {
+		int prefix_len = strlen(prefixes[i]);
+
+		if (len >= prefix_len && !memcmp(token, prefixes[i], prefix_len))
+			return true;
+	}
+	return false;
+}
+
+static bool __init qin2pro_has_prefix(const char *args, const char *prefix)
+{
+	return strstr(args, prefix) != NULL;
+}
+
+static int __init qin2pro_merge_runtime_args(const void *source, int source_len,
+						const void *target, int target_len)
+{
+	const char *src = source;
+	int out_len;
+
+	if (!target || target_len < 1 || target_len > sizeof(qin2pro_bootargs))
+		return -EINVAL;
+	memcpy(qin2pro_bootargs, target, target_len - 1);
+	out_len = target_len - 1;
+	qin2pro_bootargs[out_len] = '\0';
+
+	/* Keep only boot-mode/identity values from the bootloader.  In particular,
+	 * never reintroduce its root=/dev/ram0 or stock lcd_name. */
+	while (source && source_len > 1 && *src) {
+		const char *start = src;
+		const char *end = src;
+		int len;
+
+		while (*end && *end != ' ' && *end != '\t')
+			end++;
+		len = end - start;
+		if (len > 0 && qin2pro_runtime_prefix(start, len) &&
+		    out_len + len + 1 < sizeof(qin2pro_bootargs)) {
+			char key[64];
+			int key_len = 0;
+
+			while (key_len < len && key_len < sizeof(key) - 1 &&
+			       start[key_len] != '=')
+				key[key_len] = start[key_len], key_len++;
+			if (key_len < sizeof(key) - 1) {
+				key[key_len++] = '=';
+				key[key_len] = '\0';
+			}
+			if (!qin2pro_has_prefix(qin2pro_bootargs, key)) {
+				qin2pro_bootargs[out_len++] = ' ';
+				memcpy(qin2pro_bootargs + out_len, start, len);
+				out_len += len;
+				qin2pro_bootargs[out_len] = '\0';
+			}
+		}
+		while (*end == ' ' || *end == '\t')
+			end++;
+		if (source_len <= end - (const char *)source)
+			break;
+		source_len -= end - src;
+		src = end;
+	}
+	return out_len + 1;
+}
+
+static phys_addr_t __init qin2pro_prepare_fdt(phys_addr_t boot_fdt_phys)
+{
+	const void *boot_fdt;
+	const void *source_bootargs;
+	const void *value;
+	int source_chosen, target_chosen, source_len, target_len;
+
+	boot_fdt = fixmap_remap_fdt(boot_fdt_phys);
+	if (!boot_fdt || fdt_check_header(boot_fdt))
+		return boot_fdt_phys;
+	if (fdt_open_into(qin2pro_embedded_dtb, qin2pro_fdt_copy,
+			  sizeof(qin2pro_fdt_copy)))
+		return boot_fdt_phys;
+	source_chosen = fdt_path_offset(boot_fdt, "/chosen");
+	target_chosen = fdt_path_offset(qin2pro_fdt_copy, "/chosen");
+	if (target_chosen < 0)
+		return boot_fdt_phys;
+
+	target_len = 0;
+	value = fdt_getprop(qin2pro_fdt_copy, target_chosen,
+				"bootargs", &target_len);
+	source_bootargs = source_chosen >= 0 ?
+		fdt_getprop(boot_fdt, source_chosen, "bootargs", &source_len) : NULL;
+	if (!value || qin2pro_merge_runtime_args(source_bootargs, source_len,
+						 value, target_len) < 0)
+		return boot_fdt_phys;
+	if (fdt_setprop(qin2pro_fdt_copy, target_chosen, "bootargs",
+				qin2pro_bootargs, strlen(qin2pro_bootargs) + 1))
+		return boot_fdt_phys;
+
+	/* initrd is supplied by the bootloader for recovery.  Preserve it when
+	 * available, while allowing normal system boots with no initrd property. */
+	if (source_chosen >= 0) {
+		static const char * const props[] = {
+			"linux,initrd-start", "linux,initrd-end", "stdout-path"
+		};
+		int i, len;
+
+		for (i = 0; i < ARRAY_SIZE(props); i++) {
+			value = fdt_getprop(boot_fdt, source_chosen, props[i], &len);
+			if (value && fdt_setprop(qin2pro_fdt_copy, target_chosen,
+						 props[i], value, len))
+				return boot_fdt_phys;
+		}
+	}
+	qin2pro_embedded_selected = true;
+	qin2pro_fb_mark(5, 0xbb);
+	return __pa_symbol(qin2pro_fdt_copy);
+}
 
 /*
  * Standard memory resources
@@ -179,7 +415,8 @@ static void __init smp_build_mpidr_hash(void)
 
 static void __init setup_machine_fdt(phys_addr_t dt_phys)
 {
-	void *dt_virt = fixmap_remap_fdt(dt_phys);
+	void *dt_virt = qin2pro_embedded_selected ?
+		qin2pro_fdt_copy : fixmap_remap_fdt(dt_phys);
 	const char *name;
 
 	if (!dt_virt || !early_init_dt_scan(dt_virt)) {
@@ -256,33 +493,43 @@ void __init setup_arch(char **cmdline_p)
 
 	early_fixmap_init();
 	early_ioremap_init();
+	qin2pro_fb_mark(4, 0x99);
 
-	setup_machine_fdt(__fdt_pointer);
+	setup_machine_fdt(qin2pro_prepare_fdt(__fdt_pointer));
+	qin2pro_fb_mark(qin2pro_embedded_selected ? 6 : 7,
+			qin2pro_embedded_selected ? 0xcc : 0x33);
 
 	/*
 	 * Initialise the static keys early as they may be enabled by the
 	 * cpufeature code and early parameters.
 	 */
 	jump_label_init();
+	qin2pro_fb_mark(8, 0x24);
 	parse_early_param();
+	qin2pro_fb_mark(9, 0x36);
 
 	/*
 	 *  Unmask asynchronous aborts after bringing up possible earlycon.
 	 * (Report possible System Errors once we can report this occurred)
 	 */
 	local_async_enable();
+	qin2pro_fb_mark(10, 0x48);
 
 	/*
 	 * TTBR0 is only used for the identity mapping at this stage. Make it
 	 * point to zero page to avoid speculatively fetching new entries.
 	 */
 	cpu_uninstall_idmap();
+	qin2pro_fb_mark(11, 0x5a);
 
 	xen_early_init();
+	qin2pro_fb_mark(12, 0x6c);
 	efi_init();
+	qin2pro_fb_mark(13, 0x7e);
 	arm64_memblock_init();
 
 	paging_init();
+	qin2pro_fb_mark(21, 0xa4);
 
 	acpi_table_upgrade();
 
@@ -291,14 +538,19 @@ void __init setup_arch(char **cmdline_p)
 
 	if (acpi_disabled)
 		unflatten_device_tree();
+	qin2pro_fb_mark(22, 0xb5);
 
 	bootmem_init();
+	qin2pro_fb_mark(23, 0xc6);
 
 	kasan_init();
+	qin2pro_fb_mark(24, 0xd7);
 
 	request_standard_resources();
+	qin2pro_fb_mark(25, 0xe8);
 
 	early_ioremap_reset();
+	qin2pro_fb_mark2(26, 0xf0);
 
 	if (acpi_disabled)
 		psci_dt_init();
@@ -307,6 +559,7 @@ void __init setup_arch(char **cmdline_p)
 
 	cpu_read_bootcpu_ops();
 	smp_init_cpus();
+	qin2pro_fb_mark2(27, 0x0f);
 	smp_build_mpidr_hash();
 
 	/* Init percpu seeds for random tags after cpus are set up. */
@@ -334,6 +587,8 @@ void __init setup_arch(char **cmdline_p)
 			"This indicates a broken bootloader or old kernel\n",
 			boot_args[1], boot_args[2], boot_args[3]);
 	}
+	qin2pro_fb_mark2(28, 0x1f);
+
 }
 
 static int __init topology_init(void)
@@ -381,3 +636,17 @@ static int __init register_kernel_offset_dumper(void)
 	return 0;
 }
 __initcall(register_kernel_offset_dumper);
+
+static int __init qin2pro_fb_late(void)
+{
+	void *fb = memremap(QIN2PRO_FB_PHYS + 29 * QIN2PRO_FB_PITCH,
+			    QIN2PRO_FB_FILL, MEMREMAP_WB);
+
+	if (fb) {
+		memset(fb, 0x2f, QIN2PRO_FB_FILL);
+		__flush_dcache_area(fb, QIN2PRO_FB_FILL);
+		memunmap(fb);
+	}
+	return 0;
+}
+device_initcall(qin2pro_fb_late);

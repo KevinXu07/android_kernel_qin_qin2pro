@@ -117,8 +117,32 @@ pe_header:
 	 *                                        current RELR displacement
 	 */
 ENTRY(stext)
+	/* qin fb band0 */
+	movz	x9, #16384
+	movk	x9, #40293, lsl #16
+	mov	w10, #34
+	mov	w11, #24576
+9990:	strb	w10, [x9], #1
+	subs	w11, w11, #1
+	b.ne	9990b
 	bl	preserve_boot_args
+	/* qin fb band1 */
+	movz	x9, #49152
+	movk	x9, #40293, lsl #16
+	mov	w10, #51
+	mov	w11, #24576
+9991:	strb	w10, [x9], #1
+	subs	w11, w11, #1
+	b.ne	9991b
 	bl	el2_setup			// Drop to EL1, w0=cpu_boot_mode
+	/* qin fb band2 */
+	movz	x9, #16384
+	movk	x9, #40294, lsl #16
+	mov	w10, #85
+	mov	w11, #24576
+9992:	strb	w10, [x9], #1
+	subs	w11, w11, #1
+	b.ne	9992b
 	adrp	x23, __PHYS_OFFSET
 	and	x23, x23, MIN_KIMG_ALIGN - 1	// KASLR offset, defaults to 0
 	bl	set_cpu_boot_mode_flag
@@ -130,6 +154,14 @@ ENTRY(stext)
 	 * the TCR will have been set.
 	 */
 	bl	__cpu_setup			// initialise processor
+	/* qin fb band3 */
+	movz	x9, #49152
+	movk	x9, #40294, lsl #16
+	mov	w10, #136
+	mov	w11, #24576
+9993:	strb	w10, [x9], #1
+	subs	w11, w11, #1
+	b.ne	9993b
 	b	__primary_switch
 ENDPROC(stext)
 

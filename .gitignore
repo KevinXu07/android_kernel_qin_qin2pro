@@ -125,3 +125,5 @@ all.config
 
 # fetched Android config fragments
 kernel/configs/android-*.cfg
+out/
+arch/arm64/configs/lineage_qin2pro_defconfig.before-devtmpfs

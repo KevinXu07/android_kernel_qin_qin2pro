@@ -203,7 +203,7 @@ static int wcn_load_firmware_img(struct wcn_device *wcn_dev,
 	for (i = 1; i <= WCN_OPEN_MAX_CNT; i++) {
 		file = filp_open(path, O_RDONLY, 0);
 		if (IS_ERR(file)) {
-			WCN_ERR("try open file %s,count_num:%d, file=%d\n",
+			WCN_ERR("try open file %s,count_num:%d, file=%p\n",
 				path, i, file);
 			if (i == WCN_OPEN_MAX_CNT) {
 				WCN_ERR("open file %s error\n", path);
@@ -519,7 +519,7 @@ int wcn_download_image_ufs(struct wcn_device *wcn_dev)
 	WCN_INFO("load config ufs file:%s\n", firmware_file_path);
 	file = filp_open(firmware_file_path, O_RDONLY, 0);
 	if (IS_ERR(file)) {
-		WCN_INFO("%s:open UFS failed check emmc, file=%d\n",
+		WCN_INFO("%s:open UFS failed check emmc, file=%p\n",
 				 __func__, file);
 		s_wcn_device.wcn_mm_flag = emmc;
 		return 1;
@@ -567,7 +567,7 @@ int wcn_download_image_emmc(struct wcn_device *wcn_dev)
 	WCN_INFO("load config emmc file:%s\n", firmware_file_path);
 	file = filp_open(firmware_file_path, O_RDONLY, 0);
 	if (IS_ERR(file)) {
-		WCN_INFO("%s:open EMMC failed check ufs, file=%d\n",
+		WCN_INFO("%s:open EMMC failed check ufs, file=%p\n",
 				 __func__, file);
 		s_wcn_device.wcn_mm_flag = ufs;
 		return 1;
@@ -755,12 +755,12 @@ static int wcn_wait_gnss_boot(struct wcn_device *wcn_dev)
 		phy_addr = wcn_dev->base_addr +
 				wcn_get_apcp_sync_addr(wcn_dev) +
 				s_wcngnss_sync_addr.init_status_phy_addr;
-		WCN_DBG("gnss init sync flag addr %lu\n", phy_addr);
+		WCN_DBG("gnss init sync flag addr %pa\n", &phy_addr);
 		boot_flag = GNSS_BOOT_DONE_FLAG;
 	} else {
 		phy_addr = wcn_dev->base_addr +
 			GNSS_CALIBRATION_FLAG_CLEAR_ADDR;
-		WCN_DBG("gnss init sync flag addr %lu\n", phy_addr);
+		WCN_DBG("gnss init sync flag addr %pa\n", &phy_addr);
 	}
 
 	for (wait_count = 0; wait_count < GNSS_WAIT_CP_INIT_COUNT;

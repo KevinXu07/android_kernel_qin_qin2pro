@@ -1215,7 +1215,7 @@ int minidump_save_extend_information(const char *name, unsigned long paddr_start
 			name, paddr_start, paddr_end);
 
 	tail_section = &minidump_info_g.section_info_total.section_info[section_tail];
-	sprintf(tail_section->section_name, "");
+	tail_section->section_name[0] = 0;
 	return 0;
 }
 EXPORT_SYMBOL(minidump_save_extend_information);

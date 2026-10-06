@@ -347,7 +347,7 @@ EXPORT_SYMBOL_GPL(marlin_get_power);
 /* for qogirl6 */
 phys_addr_t wcn_get_apcp_sync_addr(struct wcn_device *wcn_dev)
 {
-	WCN_INFO("apcp_sync_addr:%lu\n", wcn_dev->apcp_sync_addr);
+	WCN_INFO("apcp_sync_addr:%pa\n", &wcn_dev->apcp_sync_addr);
 
 	return wcn_dev->apcp_sync_addr;
 }
@@ -359,7 +359,7 @@ void wcn_set_apcp_sync_addr(struct wcn_device *wcn_dev)
 		(struct wcn_special_share_mem *)wcn_dev->apcp_sync_addr;
 	else
 		s_wcngnss_sync_addr.sync_base_addr = wcn_dev->apcp_sync_addr;
-	WCN_INFO("wcn_dev->apcp_sync_addr:%lu\n", wcn_dev->apcp_sync_addr);
+	WCN_INFO("wcn_dev->apcp_sync_addr:%pa\n", &wcn_dev->apcp_sync_addr);
 }
 
 phys_addr_t wcn_get_btwf_init_status_addr(void)
@@ -653,7 +653,7 @@ int btwf_force_deepsleep(void)
 		return 0;
 	}
 
-	WCN_ERR("%s:wcn_dev=0x%x\n", __func__, wcn_dev);
+	WCN_ERR("%s:wcn_dev=0x%p\n", __func__, wcn_dev);
 	return -EINVAL;
 }
 /* NOTES:This is for QogirL6 chip.
@@ -680,7 +680,7 @@ int gnss_force_deepsleep(void)
 		return 0;
 	}
 
-	WCN_ERR("%s:wcn_dev=0x%x\n", __func__, wcn_dev);
+	WCN_ERR("%s:wcn_dev=0x%p\n", __func__, wcn_dev);
 	return -EINVAL;
 }
 

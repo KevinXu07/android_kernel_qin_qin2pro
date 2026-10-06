@@ -175,7 +175,7 @@ static ssize_t wcnlog_write(struct file *filp,
 	}
 
 	if (NULL == buf || 0 == count || 1 == count) {
-		WCN_ERR("Param Error! count = %d\n", count);
+		WCN_ERR("Param Error! count = %zu\n", count);
 		return count;
 	}
 

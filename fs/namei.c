@@ -318,7 +318,7 @@ static int acl_permission_check(struct inode *inode, int mask)
 		return 0;
 #ifdef CONFIG_SECURITY_SELINUX
 	if (avc_backtrace_enable == 1)
-		pr_err("check supplement group domaininfo: pid:%d comm:%s,uid:%d,gid:%d, fileinfo: uid:%d, gid:%d,ino:%d \n",
+		pr_err("check supplement group domaininfo: pid:%d comm:%s,uid:%d,gid:%d, fileinfo: uid:%d, gid:%d,ino:%lu \n",
 		current->pid, current->comm, current_fsuid().val, current_fsgid().val, inode->i_uid.val, inode->i_gid.val, inode->i_ino);
 #endif
 	return -EACCES;

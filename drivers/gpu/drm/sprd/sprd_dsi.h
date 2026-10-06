@@ -211,6 +211,7 @@ struct sprd_dsi {
 	struct dsi_context ctx;
 	struct sprd_dsi *dsi_master;
 	struct sprd_dsi *dsi_slave;
+	int fbdev_inited;
 };
 
 extern struct list_head dsi_core_head;

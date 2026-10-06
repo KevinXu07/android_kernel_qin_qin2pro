@@ -460,7 +460,7 @@ struct device *dev;
 extern int32_t nvt_ts_suspend(struct device *dev);
 extern int32_t nvt_ts_resume(struct device *dev);
 
-extern void himax_esd_resume_func(void);
+void __weak himax_esd_resume_func(void) {}; /* stub; real impl in disabled himax driver */
 static void sprd_panel_esd_work_func(struct work_struct *work)
 {
 	struct sprd_panel *panel = container_of(work, struct sprd_panel,
@@ -726,12 +726,14 @@ static int sprd_oled_set_brightness(struct backlight_device *bdev)
 	struct sprd_oled *oled = bl_get_data(bdev);
 	struct sprd_panel *panel = oled->panel;
 
+#ifdef CONFIG_HBM_SUPPORT
     if (g_hbm_enable){
 		DRM_INFO("firefly ,Now hbm enable, want to set level = %d\n", bdev->props.brightness);
 		DRM_INFO("firefly ,Do not allow to set other level backlight\n");
 		if (g_last_level > 0)
             bdev->props.brightness = 256;
 	}
+#endif
 
 	mutex_lock(&panel_lock);
 	if (!panel->is_enabled) {
@@ -1205,14 +1207,14 @@ static int sprd_panel_probe(struct mipi_dsi_device *slave)
 	slave->format = panel->info.format;
 	slave->mode_flags = panel->info.mode_flags;
 
+	panel->slave = slave;
+
 	ret = mipi_dsi_attach(slave);
 	if (ret) {
 		DRM_ERROR("failed to attach dsi panel to host\n");
 		drm_panel_remove(&panel->base);
 		return ret;
 	}
-	panel->slave = slave;
-
 	sprd_panel_sysfs_init(&panel->dev);
 	mipi_dsi_set_drvdata(slave, panel);
 

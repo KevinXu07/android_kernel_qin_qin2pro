@@ -2608,7 +2608,7 @@ static int shub_reboot_notifier_fn(struct notifier_block *nb, unsigned long acti
 			dev_info(&sensor->sensor_pdev->dev, "sensor_status[%d]\n", i);
 		}
 	}
-	dev_info(&sensor->sensor_pdev->dev, "reboot action=%d\n", action);
+	dev_info(&sensor->sensor_pdev->dev, "reboot action=%lu\n", action);
 	return NOTIFY_OK;
 }
 

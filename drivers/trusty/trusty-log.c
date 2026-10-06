@@ -82,7 +82,10 @@ static void trusty_dump_logs(struct trusty_log_state *s)
 		return;
 	}
 
-	BUG_ON(!is_power_of_2(log->sz));
+	if (!is_power_of_2(log->sz)) {
+		pr_err("trusty: bad log sz %u, skip dump\n", log->sz);
+		return;
+	}
 
 	/*
 	 * For this ring buffer, at any given point, alloc >= put >= get.

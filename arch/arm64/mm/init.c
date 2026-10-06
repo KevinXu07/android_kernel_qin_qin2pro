@@ -365,10 +365,12 @@ static void __init fdt_enforce_memory_region(void)
 
 void __init arm64_memblock_init(void)
 {
+	extern void qin2pro_fb_mark(unsigned int, unsigned char);
 	const s64 linear_region_size = -(s64)PAGE_OFFSET;
 
 	/* Handle linux,usable-memory-range property */
 	fdt_enforce_memory_region();
+	qin2pro_fb_mark(14, 0x41);
 
 	/*
 	 * Ensure that the linear region takes up exactly half of the kernel
@@ -396,6 +398,8 @@ void __init arm64_memblock_init(void)
 					 ARM64_MEMSTART_ALIGN);
 		memblock_remove(0, memstart_addr);
 	}
+
+	qin2pro_fb_mark(15, 0x52);
 
 	/*
 	 * Apply the memory limit if it was set. Since the kernel may be loaded
@@ -466,7 +470,9 @@ void __init arm64_memblock_init(void)
 	}
 #endif
 
+	qin2pro_fb_mark(17, 0x63);
 	early_init_fdt_scan_reserved_mem();
+	qin2pro_fb_mark(18, 0x74);
 
 	/* 4GB maximum for 32-bit only capable devices */
 	if (IS_ENABLED(CONFIG_ZONE_DMA))
@@ -480,7 +486,9 @@ void __init arm64_memblock_init(void)
 
 	high_memory = __va(memblock_end_of_DRAM() - 1) + 1;
 
+	qin2pro_fb_mark(19, 0x85);
 	dma_contiguous_reserve(arm64_dma_phys_limit);
+	qin2pro_fb_mark(20, 0x85);
 
 	memblock_allow_resize();
 }

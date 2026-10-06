@@ -551,7 +551,7 @@ static struct musb_hdrc_config sprd_musb_hdrc_config_single = {
 };
 #pragma GCC diagnostic pop
 
-extern bool USB_detect_flag;
+bool USB_detect_flag; /* defined here; stock definition lives in disabled himax driver */
 static int musb_sprd_vbus_notifier(struct notifier_block *nb,
 				unsigned long event, void *data)
 {
