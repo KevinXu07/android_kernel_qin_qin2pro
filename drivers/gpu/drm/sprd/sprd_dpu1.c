@@ -216,7 +216,7 @@ static void sprd_plane_atomic_update(struct drm_plane *plane,
 	layer->format = fb->format->format;
 	layer->alpha = s->alpha;
 	layer->blending = s->blend_mode;
-	layer->xfbc = fb->modifier;
+	layer->xfbc = 0; /* IMG FBCDC is not SPRD XFBC. */
 	layer->header_size_r = s->fbc_hsize_r;
 	layer->header_size_y = s->fbc_hsize_y;
 	layer->header_size_uv = s->fbc_hsize_uv;

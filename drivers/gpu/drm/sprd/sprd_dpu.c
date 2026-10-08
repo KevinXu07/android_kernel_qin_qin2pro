@@ -278,63 +278,6 @@ static void sprd_plane_atomic_update(struct drm_plane *plane,
 	layer->alpha = s->alpha;
 	layer->blending = s->blend_mode;
 	layer->xfbc = 0;
-	{
-		static const void *dumped_fb;
-		if (dumped_fb != fb) {
-			struct dma_buf *db = NULL;
-			void *v;
-			if (fb->obj[0] && fb->obj[0]->import_attach)
-				db = fb->obj[0]->import_attach->dmabuf;
-			DRM_ERROR("QINDBG plane%d fmt=%08x mod=%016llx pitch0=%u planes=%u db=%p sz=%zu\n",
-				  p->index, fb->format->format,
-				  (unsigned long long)fb->modifier,
-				  fb->pitches[0], fb->format->num_planes,
-				  db, db ? db->size : 0);
-			if (db) {
-				unsigned long pa = 0;
-				size_t psz = 0;
-				if (!sprd_ion_get_phys_addr_by_db(db, &pa, &psz)
-						&& pa && pa < 0x100000000UL
-						&& pfn_valid(pa >> PAGE_SHIFT)) {
-					v = phys_to_virt(pa);
-					DRM_ERROR("QINDBG pa=%lx psz=%zu\n",
-						pa, psz);
-					print_hex_dump(KERN_ERR,
-						"QINDBG head: ",
-						DUMP_PREFIX_OFFSET, 16, 4,
-						v, 128, false);
-					if (psz > 0x80100)
-						print_hex_dump(KERN_ERR,
-							"QINDBG mid: ",
-							DUMP_PREFIX_OFFSET, 16, 4,
-							v + 0x80000, 64, false);
-				} else {
-					/* scattered buffer: map first+mid page via ion */
-					void *v0;
-					unsigned long midpg;
-					v0 = sprd_ion_map_kernel(db, 0);
-					if (!IS_ERR_OR_NULL(v0)) {
-						print_hex_dump(KERN_ERR,
-							"QINDBG iova head: ",
-							DUMP_PREFIX_OFFSET, 16, 4,
-							v0, 128, false);
-						sprd_ion_unmap_kernel(db, 0);
-					} else
-						DRM_ERROR("QINDBG map0 fail\n");
-					midpg = (db->size >> PAGE_SHIFT) / 2;
-					v0 = sprd_ion_map_kernel(db, midpg);
-					if (!IS_ERR_OR_NULL(v0)) {
-						print_hex_dump(KERN_ERR,
-							"QINDBG iova mid: ",
-							DUMP_PREFIX_OFFSET, 16, 4,
-							v0, 64, false);
-						sprd_ion_unmap_kernel(db, midpg);
-					}
-				}
-			}
-			dumped_fb = fb;
-		}
-	}
 	layer->header_size_r = s->fbc_hsize_r;
 	layer->header_size_y = s->fbc_hsize_y;
 	layer->header_size_uv = s->fbc_hsize_uv;
