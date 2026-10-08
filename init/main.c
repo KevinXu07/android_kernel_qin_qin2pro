@@ -1214,6 +1214,8 @@ static void qin_wd_write_bcb(void)
 		kernel_write(qin_misc_file, bcb, sizeof(bcb), &pos);
 }
 
+static int qin_boot_done;
+
 static int qin_panic_notify(struct notifier_block *nb,
 			    unsigned long ev, void *ptr)
 {
@@ -1225,8 +1227,10 @@ static int qin_panic_notify(struct notifier_block *nb,
 static int qin_reboot_notify(struct notifier_block *nb,
 			     unsigned long ev, void *ptr)
 {
-	/* any orderly reboot syscall -> also request recovery */
-	qin_wd_write_bcb();
+	/* orderly reboot -> recovery only if boot never finished;
+	 * after boot_ok a normal reboot must boot system again */
+	if (!qin_boot_done)
+		qin_wd_write_bcb();
 	return NOTIFY_DONE;
 }
 
@@ -1250,7 +1254,7 @@ static int qin_wd_thread(void *unused)
 {
 	unsigned int tick = 0;
 
-	for (tick = 1; tick <= 660; tick++) {
+	for (tick = 1; tick <= 2400; tick++) {
 		msleep(300);
 		qin_wd_heartbeat(tick);
 		qin_wd_open_misc();
@@ -1261,10 +1265,11 @@ static int qin_wd_thread(void *unused)
 			static char zero[64];
 			if (qin_misc_file && !IS_ERR(qin_misc_file))
 				kernel_write(qin_misc_file, zero, sizeof(zero), &zpos);
+			qin_boot_done = 1;
 			return 0;
 		}
 	}
-	/* ~3.3min without boot-done: BCB already in place; restart */
+	/* ~12min without boot-done: BCB already in place; restart */
 	emergency_restart();
 
 	return 0;

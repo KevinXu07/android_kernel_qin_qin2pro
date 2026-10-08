@@ -196,7 +196,7 @@ static ssize_t regs_offset_store(struct device *dev,
 	u32 input_param[2];
 
 	str_to_u32_array(buf, 16, input_param, 2);
-	if ((input_param[0] + input_param[1]) > dpu->ctx.base_offset[1]) {
+	if ((input_param[0] + input_param[1]) > 0x400) {
 		pr_err("set reg off set over dpu register limit size\n");
 		return -EINVAL;
 	}
@@ -204,7 +204,7 @@ static ssize_t regs_offset_store(struct device *dev,
 	if (input_param[0] % 4) {
 		pr_err("input_param[0] is not a multiple of 4\n");
 	} else {
-		if ((input_param[1] > max_reg_length) || (input_param[1] <= 0))
+		if ((input_param[1] > 0x400) || (input_param[1] <= 0))
 			pr_err("input_param[1] should between 0 and %d\n", max_reg_length);
 		else {
 			dpu->ctx.base_offset[0] = input_param[0];

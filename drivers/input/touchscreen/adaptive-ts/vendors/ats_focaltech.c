@@ -385,6 +385,8 @@ static enum ts_result focaltech_handle_event(
 			pn = (struct device_node *)data;
 			if (!of_property_read_u8(pn, "a8", &ftc->a8))
 				pr_debug("parse a8 value: 0x%02X", ftc->a8);
+			if (!of_property_read_u8(pn, "a3", &ftc->a3))
+				pr_debug("parse a3 value: 0x%02X", ftc->a3);
 			ftc->single_transfer_only = !!of_get_property(pn,
 				"single-transfer-only", NULL);
 			if (ftc->single_transfer_only)

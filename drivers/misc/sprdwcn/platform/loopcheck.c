@@ -131,8 +131,8 @@ static void loopcheck_work_queue(struct work_struct *work)
 	marlin_boot_t = marlin_bootup_time_get();
 	MARLIN_64B_NS_TO_32B_MS(loopcheck_tx_ns);
 	MARLIN_64B_NS_TO_32B_MS(marlin_boot_t);
-	snprintf(a, (size_t)sizeof(a), "at+loopcheck=%llu,%llu\r\n",
-		 loopcheck_tx_ns, marlin_boot_t);
+	/* Marlin2 fw only accepts the bare command, args return AT ERROR */
+	snprintf(a, (size_t)sizeof(a), "at+loopcheck\r\n");
 
 	if (!test_bit(WCN_LOOPCHECK_OPEN, &loopcheck.status))
 		return;

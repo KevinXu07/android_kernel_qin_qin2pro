@@ -686,14 +686,18 @@ static void wcn_sipc_sblk_recv(struct sipc_chn_info *sipc_chn)
 		  sipc_chn_tostr(sipc_chn->chn, 0), sipc_chn->index);
 
 	while (!swcnblk_receive(sipc_chn->dst, sipc_chn->chn, &blk, 0)) {
-		length = blk.length - SIPC_SBLOCK_HEAD_RESERV;
+		length = blk.length - SIPC_SBLOCK_RX_HEAD_RESERV;
+		WCN_INFO("sblk recv chn[%d] blk.length:%d head:%*ph\n",
+			 sipc_chn->chn, (int)blk.length,
+			 64, (u8 *)blk.addr);
 		WCN_DEBUG("sblk length %d", length);
 		wcn_sipc_record_mbuf_recv_from_bus(sipc_chn->index, 1);
 		if (sipc_chn->index == SIPC_WIFI_DATA0_RX)
 			WCN_DEBUG("sipc sblk send. blk.addr：%p, length: %d\n",
 				 blk.addr, length);
 		wcn_sipc_recv(sipc_chn,
-			      (u8 *)blk.addr + SIPC_SBLOCK_HEAD_RESERV, length);
+			      (u8 *)blk.addr + SIPC_SBLOCK_RX_HEAD_RESERV,
+			      length);
 		ret = swcnblk_release(sipc_chn->dst, sipc_chn->chn, &blk);
 		if (ret)
 			WCN_ERR("release swcnblk[%d] err:%d\n",
@@ -906,10 +910,23 @@ static int wcn_sipc_chn_init(struct mchn_ops_t *ops)
 		sipc_chn->relate_index = sipc_chn->index;
 		/* sblock */
 		if (SIPC_CHN_STATUS(sipc_chn->chn) == SIPC_CHANNEL_UNCREATED) {
-			ret = swcnblk_create(&info, NULL, NULL);
-			if (ret < 0) {
-				WCN_ERR("sblock chn[%d] create fail!\n", idx);
-				return ret;
+			if (!swcnblk_exist(sipc_chn->dst, sipc_chn->chn)) {
+				WCN_INFO("sblock chn[%d] already created, skip!\n",
+					 idx);
+				/* OPEN notify may have fired before our
+				 * notifier was registered; READY state
+				 * implies the handshake already completed.
+				 */
+				if (!swcnblk_query(sipc_chn->dst,
+						   sipc_chn->chn))
+					sipc_chn->sipc_chn_status = true;
+			} else {
+				ret = swcnblk_create(&info, NULL, NULL);
+				if (ret < 0) {
+					WCN_ERR("sblock chn[%d] create fail!\n",
+						idx);
+					return ret;
+				}
 			}
 			SIPC_CHN_STATUS(sipc_chn->chn) = SIPC_CHANNEL_CREATED;
 		}

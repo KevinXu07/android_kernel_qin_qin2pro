@@ -228,6 +228,8 @@ int sprd_dsi_dpi_video(struct sprd_dsi *dsi)
 	ratio_x1000 = ctx->byte_clk * 1000 / (vm->pixelclock / 1000);
 	hline = vm->hactive + vm->hsync_len + vm->hfront_porch +
 		vm->hback_porch;
+	DRM_ERROR("QINDBG dsi_video: byte_clk=%u pclk=%u ratio=%u hline=%u vsa=%u\n",
+		ctx->byte_clk, vm->pixelclock, ratio_x1000, hline, vm->vsync_len);
 
 	dsi_hal_power_en(dsi, 0);
 	dsi_hal_dpi_frame_ack_en(dsi, ctx->frame_ack_en);

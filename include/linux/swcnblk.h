@@ -48,5 +48,6 @@ int swcnblk_get_arrived_count(u8 dst, u8 channel);
 int swcnblk_get_free_count(u8 dst, u8 channel);
 int swcnblk_release(u8 dst, u8 channel, struct swcnblk_blk *blk);
 int swcnblk_query(u8 dst, u8 channel);
+int swcnblk_exist(u8 dst, u8 channel);
 int swcnblk_get_cp_cache_range(u8 dst, u8 channel, u32 *addr, u32 *len);
 #endif

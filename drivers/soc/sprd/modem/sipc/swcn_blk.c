@@ -964,6 +964,18 @@ int swcnblk_query(u8 dst, u8 channel)
 }
 EXPORT_SYMBOL(swcnblk_query);
 
+int swcnblk_exist(u8 dst, u8 channel)
+{
+	struct swcnblk_mgr *swcnblk;
+
+	SWCNBLK_GET_BLK_MGR(dst, channel, swcnblk);
+	if (!swcnblk)
+		return -ENODEV;
+
+	return 0;
+}
+EXPORT_SYMBOL(swcnblk_exist);
+
 int swcnblk_get_cp_cache_range(u8 dst, u8 channel, u32 *addr, u32 *len)
 {
 	struct swcnblk_mgr *swcnblk = NULL;
