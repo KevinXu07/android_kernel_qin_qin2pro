@@ -18,7 +18,7 @@ BOOTARGS = (
     "console=ttyS1,115200n8 loglevel=8 ignore_loglevel "
     "init=/init root=/dev/mmcblk0p30 rootfstype=ext4 ro rootwait "
     "androidboot.hardware=s9863a1h10 androidboot.dtbo_idx=0 swiotlb=1 "
-    "androidboot.selinux=permissive androidboot.serialno=Qin2Pro1911010597 "
+    "androidboot.selinux=enforcing androidboot.serialno=Qin2Pro1911010597 "
     "androidboot.verifiedbootstate=orange androidboot.flash.locked=0 "
     "panic=10 log_buf_len=4M "
     "lcd_id=ID67191 lcd_name=lcd_rm67191_edo_mipi_fhd "

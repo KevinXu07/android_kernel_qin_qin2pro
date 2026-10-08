@@ -559,3 +559,11 @@ source "drivers/misc/sprd_audio/Kconfig"
 source "drivers/misc/sprd_apdu/Kconfig"
 source "drivers/misc/sprd_rf_cable/Kconfig"
 endmenu
+
+config QIN_FLASH_TORCH
+	tristate "Qin 2 Pro OCP8137 torch LED"
+	depends on I2C && NEW_LEDS
+	default y
+	help
+	  GPIO-driven torch mode for the OCP8137 flash IC (flash-ic@63
+	  node in the merged Qin DT).  Exposes /sys/class/leds/flashlight.
