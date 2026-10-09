@@ -680,6 +680,26 @@
 					reg = <0x20>;
 					compatible = "sprd,sensor-sub";
 				};
+
+				flash-ic@63 {
+					phandle = <0x16b>;
+					flash-sync-gpios = <0xd9 0x8d 0x00>;
+					flash-en-gpios = <0xd9 0x4c 0x00>;
+					flash-chip-en-gpios = <0xd9 0x59 0x00>;
+					flash-torch-en-gpios = <0xd9 0x58 0x00>;
+					sprd,lvfm-enable = <0x01>;
+					sprd,highlight-level = <0x80>;
+					sprd,preflash-level = <0x80>;
+					sprd,torch-level = <0x80>;
+					sprd,highlight = <0x01>;
+					sprd,preflash = <0x01>;
+					sprd,torch = <0x01>;
+					sprd,flash-ic = <0x1fc9>;
+					reg = <0x63>;
+					vddio-supply = <0xec>;
+					vdda-supply = <0xe7>;
+					compatible = "sprd,flash-ocp8137";
+				};
 			};
 
 			i2c@70700000 {
@@ -741,24 +761,6 @@
 				clocks = <0x08 0x0b 0x09 0x12 0x0a>;
 				phandle = <0xc7>;
 
-				flash-ic@63 {
-					status = "disabled";
-					phandle = <0x16b>;
-					flash-sync-gpios = <0xd9 0x8d 0x00>;
-					flash-en-gpios = <0xd9 0x4c 0x00>;
-					flash-chip-en-gpios = <0xd9 0x59 0x00>;
-					flash-torch-en-gpios = <0xd9 0x58 0x00>;
-					sprd,lvfm-enable = <0x01>;
-					sprd,highlight-level = <0x80>;
-					sprd,preflash-level = <0x80>;
-					sprd,torch-level = <0x80>;
-					sprd,highlight = <0x01>;
-					sprd,preflash = <0x01>;
-					sprd,torch = <0x01>;
-					sprd,flash-ic = <0x1fc9>;
-					reg = <0x63>;
-					compatible = "sprd,flash-ocp8137";
-				};
 
 				charger@6a {
 					phandle = <0x16a>;
@@ -4470,7 +4472,7 @@
 		hwdvfs_dsu = "/soc/aon/hwdvfs@40300000/dsu@0\0";
 		hwdvfs_cluster1 = "/soc/aon/hwdvfs@40300000/cluster@1\0";
 		hwdvfs_cluster0 = "/soc/aon/hwdvfs@40300000/cluster@0\0";
-		flash_ic = "/soc/ap-apb/i2c@70900000/flash-ic@63\0";
+		flash_ic = "/soc/ap-apb/i2c@70600000/flash-ic@63\0";
 		vddvbus = "/soc/ap-apb/i2c@70900000/charger@6a/otg-vbus\0";
 		fan54015_chg = "/soc/ap-apb/i2c@70900000/charger@6a\0";
 		sensor_sub2 = "/soc/ap-apb/i2c@70600000/sensor-sub2@2a\0";

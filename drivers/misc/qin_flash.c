@@ -1,26 +1,29 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Qin 2 Pro OCP8137 torch/flash LED driver.
+ * Qin 2 Pro flashlight driver.
  *
- * The OCP8137 flash IC sits on i2c@70900000 (addr 0x63) and is gated by
- * four AP GPIOs described by the stock DTS node "flash-ic@63":
- *   flash-chip-en-gpios  - main chip enable / power
- *   flash-torch-en-gpios - torch mode enable
- *   flash-en-gpios       - strobe (flash mode) enable
- *   flash-sync-gpios     - sync input, kept low
+ * The stock DT ships a "flash-ic@63" node (sprd,flash-ocp8137 family:
+ * OCP8137 / AW3641 / WD3124DA share i2c addr 0x63 and the same EN-pin
+ * scheme) under i2c@70600000 (i2c1).
  *
- * For camera torch use we only need chip-en + torch-en: the OCP8137
- * lights the LED at the hardware default torch current.  Exposed as a
- * led_classdev named "flashlight" so userspace can drive it through
- * /sys/class/leds/flashlight/brightness.
+ * The torch LED is driven either by the boost IC or directly by the
+ * flash-*-en GPIOs through a transistor - both paths respond to the
+ * same GPIOs (the pins are wired to the IC's HW-enable inputs on IC
+ * variants, so asserting them is correct either way).  When the i2c
+ * chip answers we also program its torch-current register; when the
+ * camera bus is dead (unpowered sensors clamp SDA on this board) the
+ * writes just fail and GPIO still does the job.
+ *
+ * Exposes led_classdev "flashlight" -> /sys/class/leds/flashlight.
+ * The flash-sync GPIO is deliberately left alone (strobe timing only).
  */
-
-#include <linux/gpio/consumer.h>
-#include <linux/i2c.h>
-#include <linux/leds.h>
 #include <linux/module.h>
+#include <linux/i2c.h>
+#include <linux/gpio/consumer.h>
+#include <linux/leds.h>
+#include <linux/regulator/consumer.h>
 #include <linux/of.h>
-#include <linux/slab.h>
+#include <linux/delay.h>
 
 struct qin_flash {
 	struct i2c_client *client;
@@ -28,23 +31,46 @@ struct qin_flash {
 	struct gpio_desc *chip_en;
 	struct gpio_desc *torch_en;
 	struct gpio_desc *flash_en;
-	struct gpio_desc *sync;
+	struct regulator *vddio;
+	struct regulator *vdda;
+	bool have_ic;
 };
 
-static void qin_flash_set(struct qin_flash *flash, int on)
+/* OCP8137-style registers; AW3641/WD3124 use the same layout family. */
+#define QIN_FLASH_REG_ENABLE	0x00
+#define QIN_FLASH_REG_TCUR	0x02	/* torch current */
+#define QIN_FLASH_MODE_TORCH	0x0c	/* hw torch enable on these ICs */
+
+static int qin_flash_hw(struct qin_flash *f, int on)
 {
-	gpiod_set_value_cansleep(flash->chip_en, on);
-	gpiod_set_value_cansleep(flash->torch_en, on);
+	gpiod_set_value_cansleep(f->chip_en, 1);
+	/* GPIO path: correct for dumb-LED and for the IC's HW torch-en. */
+	gpiod_set_value_cansleep(f->torch_en, on);
+	gpiod_set_value_cansleep(f->flash_en, 0);
+
+	if (f->have_ic) {
+		int ret;
+		if (on) {
+			i2c_smbus_write_byte_data(f->client, QIN_FLASH_REG_TCUR, 0x80);
+			ret = i2c_smbus_write_byte_data(f->client,
+					QIN_FLASH_REG_ENABLE, QIN_FLASH_MODE_TORCH);
+		} else {
+			ret = i2c_smbus_write_byte_data(f->client,
+					QIN_FLASH_REG_ENABLE, 0x00);
+		}
+		if (ret)
+			dev_dbg(&f->client->dev, "ic write failed: %d\n", ret);
+	}
+	if (!on)
+		gpiod_set_value_cansleep(f->chip_en, 0);
+	return 0;
 }
 
 static int qin_flash_brightness_set(struct led_classdev *cdev,
 				    enum led_brightness brightness)
 {
-	struct qin_flash *flash =
-		container_of(cdev, struct qin_flash, cdev);
-
-	qin_flash_set(flash, brightness ? 1 : 0);
-	return 0;
+	struct qin_flash *f = container_of(cdev, struct qin_flash, cdev);
+	return qin_flash_hw(f, brightness > 0);
 }
 
 static int qin_flash_probe(struct i2c_client *client,
@@ -52,55 +78,54 @@ static int qin_flash_probe(struct i2c_client *client,
 {
 	struct device *dev = &client->dev;
 	struct qin_flash *flash;
-	int ret;
+	int ret, i, nonzero = 0;
 
 	flash = devm_kzalloc(dev, sizeof(*flash), GFP_KERNEL);
 	if (!flash)
 		return -ENOMEM;
-
 	flash->client = client;
+
+	/* i2c pull-up / analog rails (optional - log only on failure). */
+	flash->vddio = devm_regulator_get_optional(dev, "vddio");
+	if (!IS_ERR(flash->vddio))
+		regulator_enable(flash->vddio);
+	flash->vdda = devm_regulator_get_optional(dev, "vdda");
+	if (!IS_ERR(flash->vdda))
+		regulator_enable(flash->vdda);
+
 	flash->chip_en = devm_gpiod_get(dev, "flash-chip-en", GPIOD_OUT_LOW);
-	if (IS_ERR(flash->chip_en)) {
-		dev_err(dev, "cannot get flash-chip-en gpio\n");
-		return PTR_ERR(flash->chip_en);
-	}
-
+	if (IS_ERR(flash->chip_en))
+		flash->chip_en = NULL;
 	flash->torch_en = devm_gpiod_get(dev, "flash-torch-en", GPIOD_OUT_LOW);
-	if (IS_ERR(flash->torch_en)) {
-		dev_err(dev, "cannot get flash-torch-en gpio\n");
-		return PTR_ERR(flash->torch_en);
-	}
-
-	/* Optional lines: claim them low so nothing floats. */
+	if (IS_ERR(flash->torch_en))
+		flash->torch_en = NULL;
 	flash->flash_en = devm_gpiod_get(dev, "flash-en", GPIOD_OUT_LOW);
 	if (IS_ERR(flash->flash_en))
 		flash->flash_en = NULL;
-	flash->sync = devm_gpiod_get(dev, "flash-sync", GPIOD_OUT_LOW);
-	if (IS_ERR(flash->sync))
-		flash->sync = NULL;
+
+	/* wake the boost IC, then check whether i2c answers mean anything */
+	gpiod_set_value_cansleep(flash->chip_en, 1);
+	msleep(5);
+	for (i = 0; i <= 0x0f; i++) {
+		int v = i2c_smbus_read_byte_data(client, i);
+		if (v > 0)
+			nonzero = 1;
+	}
+	flash->have_ic = nonzero;
+	dev_info(dev, "flash-ic probe: %s\n",
+		 flash->have_ic ? "i2c chip present" :
+		 "no usable i2c answer, GPIO drive only");
 
 	flash->cdev.name = "flashlight";
-	flash->cdev.max_brightness = 1;
-	flash->cdev.brightness_set_blocking = qin_flash_brightness_set;
-	flash->cdev.flags = LED_CORE_SUSPENDRESUME;
-
+	flash->cdev.brightness = LED_OFF;
+	flash->cdev.max_brightness = 255;
+	flash->cdev.brightness_set = qin_flash_brightness_set;
 	ret = devm_led_classdev_register(dev, &flash->cdev);
-	if (ret) {
+	if (ret)
 		dev_err(dev, "cannot register led\n");
-		return ret;
-	}
 
 	i2c_set_clientdata(client, flash);
-	dev_info(dev, "qin flash torch registered\n");
-	return 0;
-}
-
-static int qin_flash_remove(struct i2c_client *client)
-{
-	struct qin_flash *flash = i2c_get_clientdata(client);
-
-	qin_flash_set(flash, 0);
-	return 0;
+	return ret;
 }
 
 static const struct of_device_id qin_flash_of_match[] = {
@@ -109,15 +134,21 @@ static const struct of_device_id qin_flash_of_match[] = {
 };
 MODULE_DEVICE_TABLE(of, qin_flash_of_match);
 
+static const struct i2c_device_id qin_flash_id[] = {
+	{ "ocp8137", 0 },
+	{ }
+};
+MODULE_DEVICE_TABLE(i2c, qin_flash_id);
+
 static struct i2c_driver qin_flash_driver = {
 	.driver = {
-		.name = "qin-flash-ocp8137",
+		.name = "qin_flash",
 		.of_match_table = qin_flash_of_match,
 	},
 	.probe = qin_flash_probe,
-	.remove = qin_flash_remove,
+	.id_table = qin_flash_id,
 };
 module_i2c_driver(qin_flash_driver);
 
-MODULE_DESCRIPTION("Qin 2 Pro OCP8137 torch LED driver");
+MODULE_DESCRIPTION("Qin 2 Pro flashlight (OCP8137/AW3641 or GPIO) driver");
 MODULE_LICENSE("GPL");

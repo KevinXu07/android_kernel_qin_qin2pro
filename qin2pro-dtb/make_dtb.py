@@ -17,9 +17,18 @@ parser.add_argument('--output', type=Path, default=HERE / 'merged-qin414.dtb')
 args = parser.parse_args()
 source, output = args.source.resolve(), args.output.resolve()
 text = source.read_text(encoding='utf-8')
-flash_nodes = re.findall(r'flash-ic@63\s*\{([^{}]*)\}', text)
-if len(flash_nodes) != 1 or not re.search(r'status\s*=\s*"disabled"', flash_nodes[0]):
-    raise SystemExit('Refusing DT: stock-disabled OCP8137 node must remain disabled.')
+# The stock DT keeps flash-ic@63 disabled under i2c@70600000 (the real bus).
+# Enabling it is only allowed there; any other placement is the old
+# wrong-bus mistake (that variant also grabbed the flash-sync pin and broke
+# the boot-time display). qin_flash never touches flash-sync-gpios now.
+flash_match = re.search(r'flash-ic@63\s*\{([^{}]*)\}', text)
+if flash_match:
+    bus = re.findall(r'(i2c@70600000|i2c@70900000)\s*\{(?:[^{}]|\{[^{}]*\})*'
+                     r'flash-ic@63', text)
+    enabled = not re.search(r'status\s*=\s*"disabled"', flash_match.group(1))
+    if enabled and bus != ['i2c@70600000']:
+        raise SystemExit(
+            'Refusing DT: enabled flash-ic@63 must live on i2c@70600000.')
 output.parent.mkdir(parents=True, exist_ok=True)
 
 def linux_path(path):
