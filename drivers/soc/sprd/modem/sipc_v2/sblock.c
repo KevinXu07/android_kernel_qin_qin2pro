@@ -980,7 +980,7 @@ int sblock_register_notifier(u8 dst, u8 channel,
 	sblock = sblocks[dst][ch_index];
 
 	if (!sblock) {
-		pr_err("sblock-%d-%d not ready!\n", dst, channel);
+		pr_err_ratelimited("sblock-%d-%d not ready!\n", dst, channel);
 		return -ENODEV;
 	}
 #ifndef CONFIG_SPRD_SIPC_WCN
@@ -1019,7 +1019,7 @@ struct sblock_mgr *sblock_register_notifier_ex(u8 dst, u8 channel,
 
 	/* client block, after block ready, return the sblock. */
 	if (smsg_ipcs[dst]->client && sblock->state != SBLOCK_STATE_READY) {
-		pr_err("%s:sblock-%d-%d not ready!\n", __func__, dst, channel);
+		pr_err_ratelimited("%s:sblock-%d-%d not ready!\n", __func__, dst, channel);
 		return NULL;
 	}
 
@@ -1075,7 +1075,7 @@ int sblock_get(u8 dst, u8 channel, struct sblock *blk, int timeout)
 	sblock = sblocks[dst][ch_index];
 
 	if (!sblock || sblock->state != SBLOCK_STATE_READY) {
-		pr_err("sblock-%d-%d not ready!\n", dst, channel);
+		pr_err_ratelimited("sblock-%d-%d not ready!\n", dst, channel);
 		return sblock ? -EIO : -ENODEV;
 	}
 
@@ -1167,7 +1167,7 @@ static int sblock_send_ex(u8 dst, u8 channel,
 	sblock = sblocks[dst][ch_index];
 
 	if (!sblock || sblock->state != SBLOCK_STATE_READY) {
-		pr_err("sblock-%d-%d not ready!\n", dst, channel);
+		pr_err_ratelimited("sblock-%d-%d not ready!\n", dst, channel);
 		return sblock ? -EIO : -ENODEV;
 	}
 
@@ -1240,7 +1240,7 @@ int sblock_send_finish(u8 dst, u8 channel)
 
 	sblock = sblocks[dst][ch_index];
 	if (!sblock || sblock->state != SBLOCK_STATE_READY) {
-		pr_err("sblock-%d-%d not ready!\n", dst, channel);
+		pr_err_ratelimited("sblock-%d-%d not ready!\n", dst, channel);
 		return sblock ? -EIO : -ENODEV;
 	}
 
@@ -1277,7 +1277,7 @@ int sblock_receive(u8 dst, u8 channel,
 	sblock = sblocks[dst][ch_index];
 
 	if (!sblock || sblock->state != SBLOCK_STATE_READY) {
-		pr_err("sblock-%d-%d not ready!\n", dst, channel);
+		pr_err_ratelimited("sblock-%d-%d not ready!\n", dst, channel);
 		return sblock ? -EIO : -ENODEV;
 	}
 
@@ -1374,7 +1374,7 @@ int sblock_get_arrived_count(u8 dst, u8 channel)
 
 	sblock = sblocks[dst][ch_index];
 	if (!sblock || sblock->state != SBLOCK_STATE_READY) {
-		pr_err("sblock-%d-%d not ready!\n", dst, channel);
+		pr_err_ratelimited("sblock-%d-%d not ready!\n", dst, channel);
 		return -ENODEV;
 	}
 
@@ -1407,7 +1407,7 @@ int sblock_get_free_count(u8 dst, u8 channel)
 
 	sblock = sblocks[dst][ch_index];
 	if (!sblock || sblock->state != SBLOCK_STATE_READY) {
-		pr_err("sblock-%d-%d not ready!\n", dst, channel);
+		pr_err_ratelimited("sblock-%d-%d not ready!\n", dst, channel);
 		return -ENODEV;
 	}
 
@@ -1441,7 +1441,7 @@ int sblock_release(u8 dst, u8 channel, struct sblock *blk)
 
 	sblock = sblocks[dst][ch_index];
 	if (!sblock || sblock->state != SBLOCK_STATE_READY) {
-		pr_err("sblock-%d-%d not ready!\n", dst, channel);
+		pr_err_ratelimited("sblock-%d-%d not ready!\n", dst, channel);
 		return -ENODEV;
 	}
 
@@ -1504,7 +1504,7 @@ unsigned int sblock_poll_wait(u8 dst, u8 channel,
 	ringhd_op = &(ring->header_op.ringhd_op);
 
 	if (sblock->state != SBLOCK_STATE_READY) {
-		pr_err("sblock-%d-%d not ready to poll !\n",
+		pr_err_ratelimited("sblock-%d-%d not ready to poll !\n",
 		       dst, channel);
 		return mask;
 	}

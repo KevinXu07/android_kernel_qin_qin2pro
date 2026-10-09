@@ -39,7 +39,7 @@
 
 #include "saudio.h"
 
-#define ETRACE(x...) pr_err("Error: " x)
+#define ETRACE(x...) pr_err_ratelimited("Error: " x)
 #define WTRACE(x...) pr_warn(x)
 
 #define ADEBUG() pr_debug("saudio.c: function: %s,line %d\n", \
@@ -1270,8 +1270,8 @@ static void saudio_snd_wait_modem_restart(struct snd_saudio *saudio)
 					   dev_ctrl->monitor_channel,
 					   SAUDIO_CMD_HANDSHAKE, 0, -1);
 		if (result) {
-			schedule_timeout_interruptible(msecs_to_jiffies(1000));
-			pr_err("saudio_wait_monitor_cmd error %d\n", result);
+			schedule_timeout_interruptible(msecs_to_jiffies(10000));
+			pr_err_ratelimited("saudio_wait_monitor_cmd error %d\n", result);
 			continue;
 		} else {
 			while (1) {
@@ -1282,10 +1282,10 @@ static void saudio_snd_wait_modem_restart(struct snd_saudio *saudio)
 						0, 0, -1);
 				if (!result)
 					break;
-				pr_err("saudio_send_monitor_cmd error %d\n",
+				pr_err_ratelimited("saudio_send_monitor_cmd error %d\n",
 				       result);
 				schedule_timeout_interruptible(
-					msecs_to_jiffies(1000));
+					msecs_to_jiffies(10000));
 			}
 		}
 		break;
@@ -1311,7 +1311,7 @@ static int saudio_snd_notify_modem_clear(struct snd_saudio *saudio)
 					       dev_ctrl->monitor_channel,
 			SAUDIO_CMD_RESET_RET, 0, CMD_MODEM_RESET_TIMEOUT);
 		if (result)
-			pr_err("saudio_wait_monitor_cmd error %d\n", result);
+			pr_err_ratelimited("saudio_wait_monitor_cmd error %d\n", result);
 	}
 	pr_info("saudio.c:saudio_snd_notify_mdem_clear out");
 

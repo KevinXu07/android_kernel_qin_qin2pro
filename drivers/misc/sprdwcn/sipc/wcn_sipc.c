@@ -687,7 +687,7 @@ static void wcn_sipc_sblk_recv(struct sipc_chn_info *sipc_chn)
 
 	while (!swcnblk_receive(sipc_chn->dst, sipc_chn->chn, &blk, 0)) {
 		length = blk.length - SIPC_SBLOCK_RX_HEAD_RESERV;
-		WCN_INFO("sblk recv chn[%d] blk.length:%d head:%*ph\n",
+		WCN_DEBUG("sblk recv chn[%d] blk.length:%d head:%*ph\n",
 			 sipc_chn->chn, (int)blk.length,
 			 64, (u8 *)blk.addr);
 		WCN_DEBUG("sblk length %d", length);
