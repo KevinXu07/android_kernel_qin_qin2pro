@@ -805,10 +805,16 @@
 				interrupts = <0x00 0x09 0x04>;
 				#address-cells = <0x01>;
 				#size-cells = <0x00>;
-				status = "disabled";
+				status = "okay";
 				clock-names = "enable\0spi\0source";
 				clocks = <0x08 0x06 0x09 0x17 0x06 0x03>;
 				phandle = <0xca>;
+
+				silead-fp@0 {
+					compatible = "sprd,silead-fp-ir";
+					reg = <0x00>;
+					spi-max-frequency = <24000000>;
+				};
 			};
 
 			i2s@70d00000 {
@@ -4299,7 +4305,7 @@
 	chosen {
 		bootargs_ext = "androidboot.hardware=s9863a1h10 androidboot.dtbo_idx=0";
 		stdout-path = "/soc/ap-apb/serial@70100000";
-		bootargs = "earlycon=sprd_serial,0x70100000,115200n8 console=ttyS1,115200n8 loglevel=3 init=/init root=/dev/mmcblk0p30 rootfstype=ext4 ro rootwait androidboot.hardware=s9863a1h10 androidboot.dtbo_idx=0 swiotlb=1 androidboot.selinux=permissive androidboot.serialno=Qin2Pro1911010597 androidboot.verifiedbootstate=orange androidboot.flash.locked=0 panic=10 log_buf_len=4M lcd_id=ID67191 lcd_name=lcd_rm67191_edo_mipi_fhd lcd_base=9d654000 lcd_size=1440x576 pixel_clock=67000000";
+		bootargs = "loglevel=3 init=/init root=/dev/mmcblk0p30 rootfstype=ext4 ro rootwait androidboot.hardware=s9863a1h10 androidboot.dtbo_idx=0 swiotlb=1 androidboot.selinux=permissive androidboot.serialno=Qin2Pro1911010597 androidboot.verifiedbootstate=orange androidboot.flash.locked=0 panic=10 log_buf_len=4M lcd_id=ID67191 lcd_name=lcd_rm67191_edo_mipi_fhd lcd_base=9d654000 lcd_size=1440x576 pixel_clock=67000000";
 		phandle = <0x13a>;
 	};
 
