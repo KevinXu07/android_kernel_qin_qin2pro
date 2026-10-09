@@ -265,6 +265,8 @@
 			sprd,dsi-work-mode = <0x01>;
 			sprd,dsi-lane-number = <0x04>;
 			sprd,dsi-color-format = "rgb888";
+			sprd,phy-bit-clock = <0xf4240>;
+			sprd,phy-escape-clock = <0x4e20>;
 			sprd,width-mm = <0x44>;
 			sprd,height-mm = <0x79>;
 			sprd,esd-check-enable = <0x00>;
@@ -740,6 +742,7 @@
 				phandle = <0xc7>;
 
 				flash-ic@63 {
+					status = "disabled";
 					phandle = <0x16b>;
 					flash-sync-gpios = <0xd9 0x8d 0x00>;
 					flash-en-gpios = <0xd9 0x4c 0x00>;
@@ -2186,6 +2189,8 @@
 
 				panel {
 					sprd,backlight = <0x148>;
+					sprd,phy-bit-clock = <0xf4240>;
+					sprd,phy-escape-clock = <0x4e20>;
 					reset-gpio = <0xd9 0x32 0x00>;
 					avee-gpio = <0xd9 0x05 0x00>;
 					avdd-gpio = <0xd9 0x04 0x00>;
@@ -3510,7 +3515,7 @@
 		sprd,ctrl-probe-num = <0x02>;
 		sprd,ctrl-reg = <0x1004 0x3198 0x2100 0x20cc 0x20b0 0x1008>;
 		sprd,ctrl-mask = <0xffffff 0x7ff 0x3000000 0x80000 0x10800 0x40>;
-		sprd,ctrl-value = <0x300000 0x102 0x3000000 0x80000 0x10800 0x40>;
+		sprd,ctrl-value = <0x300000 0x104 0x3000000 0x80000 0x10800 0x40>;
 		sprd,ctrl-rw-offset = <0x1000 0x00 0x2000 0x2000 0x2000 0x1000>;
 		sprd,ctrl-us-delay = <0x0a 0x0a 0x0a 0x0a 0x0a 0x0a>;
 		sprd,ctrl-type = <0x03 0x00 0x01 0x01 0x01 0x03>;
@@ -4294,7 +4299,7 @@
 	chosen {
 		bootargs_ext = "androidboot.hardware=s9863a1h10 androidboot.dtbo_idx=0";
 		stdout-path = "/soc/ap-apb/serial@70100000";
-		bootargs = "earlycon=sprd_serial,0x70100000,115200n8 console=ttyS1,115200n8 loglevel=8 ignore_loglevel init=/init root=/dev/mmcblk0p30 rootfstype=ext4 ro rootwait androidboot.hardware=s9863a1h10 androidboot.dtbo_idx=0 swiotlb=1 androidboot.selinux=permissive androidboot.serialno=Qin2Pro1911010597 androidboot.verifiedbootstate=orange androidboot.flash.locked=0 panic=10 log_buf_len=4M lcd_id=ID67191 lcd_name=lcd_rm67191_edo_mipi_fhd lcd_base=9d654000 lcd_size=1440x576 pixel_clock=67000000";
+		bootargs = "earlycon=sprd_serial,0x70100000,115200n8 console=ttyS1,115200n8 loglevel=3 init=/init root=/dev/mmcblk0p30 rootfstype=ext4 ro rootwait androidboot.hardware=s9863a1h10 androidboot.dtbo_idx=0 swiotlb=1 androidboot.selinux=enforcing androidboot.serialno=Qin2Pro1911010597 androidboot.verifiedbootstate=orange androidboot.flash.locked=0 panic=10 log_buf_len=4M lcd_id=ID67191 lcd_name=lcd_rm67191_edo_mipi_fhd lcd_base=9d654000 lcd_size=1440x576 pixel_clock=67000000";
 		phandle = <0x13a>;
 	};
 
@@ -4327,6 +4332,11 @@
 		wcn-mem@88000000 {
 			reg = <0x00 0x88000000 0x00 0x300000>;
 			phandle = <0x9c>;
+		};
+
+		sprd-wlan-txrx@89000000 {
+			no-map;
+			reg = <0x00 0x89000000 0x00 0x300000>;
 		};
 
 		gnss-mem@88300000 {
@@ -4382,6 +4392,7 @@
 
 	sprd-wlan {
 		compatible = "sprd,sp9863a";
+		reg = <0x00 0x89000000 0x00 0x300000>;
 	};
 
 	rebootescrow@0 {
@@ -4743,8 +4754,8 @@
 		gsp = "/sprd-gsp";
 		wcn_btwf = "/cpwcn_btwf";
 		wcn_gnss = "/cpwcn_gnss";
-		sipc2 = "/wcn_sipc/sipc@84180000";
-		sipc3 = "/wcn_sipc/sipc@8441b000";
+		sipc2 = "/wcn_sipc/sipc@88180000";
+		sipc3 = "/wcn_sipc/sipc@8841b000";
 		scproc_pubpm = "/scproc-pubcp/scproc@800000";
 		scproc_pubcp = "/scproc-pubcp/scproc@f000";
 		sipc0 = "/sprd-sipc/sipc@88e00000";
