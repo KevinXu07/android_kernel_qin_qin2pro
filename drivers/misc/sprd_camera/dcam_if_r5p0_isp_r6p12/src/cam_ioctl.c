@@ -2074,7 +2074,8 @@ static int sprd_camioctl_camera_raw_pipeline_cfg(struct camera_file *camerafile)
 		path->frm_reserved_addr = cam_addr;
 	}
 
-	if (path_pre->is_work && !path_pre->frm_reserved_addr.buf_info.num &&
+	if (path_pre->is_work && !path_pre->frm_reserved_addr.mfd_y &&
+		!path_pre->frm_reserved_addr.buf_info.num &&
 		path_pre->out_size.w && path_pre->out_size.h) {
 		struct camera_addr cam_addr = {0};
 		size_t size = (size_t)path_pre->out_size.w *
@@ -2708,7 +2709,9 @@ static int sprd_camioctl_isp_path_block_cfg(struct camera_path_spec *path,
 		pr_err("fail to cfg path %d output addr\n", path_index);
 		goto exit;
 	}
-	if (!path->frm_reserved_addr.buf_info.num && path->out_size.w &&
+	/* User buffers acquire buf_info.num later in ISP path setup. */
+	if (!path->frm_reserved_addr.mfd_y &&
+		!path->frm_reserved_addr.buf_info.num && path->out_size.w &&
 		path->out_size.h) {
 		struct camera_addr cam_addr = {0};
 		size_t size = (size_t)path->out_size.w * path->out_size.h * 2;
