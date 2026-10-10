@@ -616,3 +616,80 @@
 &dpu {
 	sprd,logo-memory = <&logo_reserved>;
 };
+
+/* Camera: enable dcam/isp/csi/cpp + iommus for the imported r5p0/r6p12
+ * driver stack. Mirrors the stock device tree wiring. */
+&dcam {
+	compatible = "sprd,dcam";
+	sprd,syscon-pmu-apb = <&pmu_apb_regs>;
+	status = "okay";
+};
+
+&iommu_dcam {
+	status = "okay";
+};
+
+&isp {
+	sprd,aon-apb-syscon = <&aon_apb_regs>;
+	status = "okay";
+};
+
+&iommu_isp {
+	status = "okay";
+};
+
+&csi0 {
+	status = "okay";
+};
+
+&csi1 {
+	status = "okay";
+};
+
+&csi2 {
+	status = "okay";
+};
+
+&cpp {
+	sprd,aon-apb-syscon = <&aon_apb_regs>;
+	sprd,cam-ahb-syscon = <&mm_ahb_regs>;
+	sprd,vsp-ahb-syscon = <&mm_vsp_ahb_regs>;
+	sprd,pmu-apb-syscon = <&pmu_apb_regs>;
+	status = "okay";
+};
+
+&iommu_cpp {
+	status = "okay";
+};
+
+/* mipi csi-phy wiring mirrors stock: phy1(4lane)->csi0,
+ * phy2(2lane)->csi2, phy0-s(2p2_m)->csi1, phy0-m(2p2_s)->csi0,
+ * phy0-m1(2p2_s)->csi2; phy0 stays disabled. */
+&mipi_csi_phy0 {
+	status = "disabled";
+};
+
+&mipi_csi_phy1 {
+	sprd,csi = <&csi0>;
+	status = "okay";
+};
+
+&mipi_csi_phy2 {
+	sprd,csi = <&csi2>;
+	status = "okay";
+};
+
+&mipi_csi_phy0_m {
+	sprd,csi = <&csi0>;
+	status = "okay";
+};
+
+&mipi_csi_phy0_s {
+	sprd,csi = <&csi1>;
+	status = "okay";
+};
+
+&mipi_csi_phy0_s1 {
+	sprd,csi = <&csi2>;
+	status = "okay";
+};

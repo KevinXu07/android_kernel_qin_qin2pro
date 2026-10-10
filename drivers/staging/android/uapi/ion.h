@@ -89,6 +89,12 @@ struct ion_phy_data {
 	__u64 addr;
 };
 
+/* Argument wrapper used by the legacy vendor ION custom ioctl. */
+struct ion_custom_data {
+	__u32 cmd;
+	unsigned long arg;
+};
+
 #define MAX_HEAP_NAME			32
 
 /**
@@ -141,6 +147,9 @@ struct ion_heap_query {
 
 #define ION_IOC_PHY           _IOWR(ION_IOC_MAGIC, 9, \
 					struct ion_phy_data)
+
+#define ION_IOC_CUSTOM        _IOWR(ION_IOC_MAGIC, 6, \
+					struct ion_custom_data)
 
 #define ION_IOC_VERSION        _IOWR(ION_IOC_MAGIC, 10, \
 					struct  ion_allocation_data)

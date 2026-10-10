@@ -558,6 +558,9 @@ source "drivers/misc/sprd_wcn_n6pro/Kconfig"
 source "drivers/misc/sprd_audio/Kconfig"
 source "drivers/misc/sprd_apdu/Kconfig"
 source "drivers/misc/sprd_rf_cable/Kconfig"
+source "drivers/misc/sprd_camera/Kconfig"
+source "drivers/misc/sprd_otp/Kconfig"
+
 endmenu
 
 config QIN_FLASH_TORCH

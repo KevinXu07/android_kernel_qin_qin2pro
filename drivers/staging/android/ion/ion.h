@@ -381,6 +381,10 @@ int ion_page_pool_shrink(struct ion_page_pool *pool, gfp_t gfp_mask,
 			 int nr_to_scan);
 
 long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg);
+int ion_open(struct inode *inode, struct file *file);
+int ion_release(struct inode *inode, struct file *file);
+bool ion_is_legacy_ioctl(unsigned int cmd);
+long ion_legacy_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
 
 int ion_query_heaps(struct ion_heap_query *query);
 struct dma_buf *ion_new_alloc(size_t len, unsigned int heap_id_mask,

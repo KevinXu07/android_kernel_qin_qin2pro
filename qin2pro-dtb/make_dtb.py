@@ -23,7 +23,7 @@ text = source.read_text(encoding='utf-8')
 # the boot-time display). qin_flash never touches flash-sync-gpios now.
 flash_match = re.search(r'flash-ic@63\s*\{([^{}]*)\}', text)
 if flash_match:
-    bus = re.findall(r'(i2c@70600000|i2c@70900000)\s*\{(?:[^{}]|\{[^{}]*\})*'
+    bus = re.findall(r'(i2c@70600000|i2c@70900000)\s*\{(?:[^{}]|\{(?:[^{}]|\{(?:[^{}]|\{[^{}]*\})*\})*\})*'
                      r'flash-ic@63', text)
     enabled = not re.search(r'status\s*=\s*"disabled"', flash_match.group(1))
     if enabled and bus != ['i2c@70600000']:

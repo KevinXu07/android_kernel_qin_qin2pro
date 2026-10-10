@@ -45,4 +45,6 @@ int sprd_ion_get_phys_addr_by_db(struct dma_buf *dmabuf,
 void *sprd_ion_map_kernel(struct dma_buf *dmabuf, unsigned long offset);
 
 int sprd_ion_unmap_kernel(struct dma_buf *dmabuf, unsigned long offset);
+int sprd_ion_check_phys_addr(struct dma_buf *dmabuf);
+long sprd_ion_custom_ioctl(unsigned int cmd, unsigned long arg);
 #endif /* _SPRD_ION_H */

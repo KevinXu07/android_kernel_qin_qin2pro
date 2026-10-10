@@ -14,17 +14,27 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/compat.h>
 #include <linux/dma-buf.h>
 #include <linux/file.h>
 #include <linux/fs.h>
 #include <linux/uaccess.h>
+#include <linux/sprd_ion.h>
 
 #include "ion.h"
+
+struct ion_custom_data32 {
+	__u32 cmd;
+	__u32 arg;
+};
+#define ION_IOC_CUSTOM32 _IOWR('I', 6, struct ion_custom_data32)
 
 union ion_ioctl_arg {
 	struct ion_allocation_data allocation;
 	struct ion_heap_query query;
 	struct ion_phy_data phy;
+	struct ion_custom_data custom;
+	struct ion_custom_data32 custom32;
 };
 
 static int validate_ioctl_arg(unsigned int cmd, union ion_ioctl_arg *arg)
@@ -58,6 +68,9 @@ long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	int ret = 0;
 	unsigned int dir;
 	union ion_ioctl_arg data;
+
+	if (ion_is_legacy_ioctl(cmd))
+		return ion_legacy_ioctl(filp, cmd, arg);
 
 	dir = ion_ioctl_dir(cmd);
 
@@ -107,8 +120,25 @@ long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	case ION_IOC_HEAP_QUERY:
 		ret = ion_query_heaps(&data.query);
 		break;
+#if defined(CONFIG_COMPAT) && defined(CONFIG_64BIT)
+	case ION_IOC_CUSTOM32:
+#ifdef CONFIG_ION_SPRD
+		return sprd_ion_custom_ioctl(data.custom32.cmd,
+				(unsigned long)compat_ptr(data.custom32.arg));
+#else
+		return -ENOTTY;
+#endif
+#endif
+	case ION_IOC_CUSTOM:
+#ifdef CONFIG_ION_SPRD
+		return sprd_ion_custom_ioctl(data.custom.cmd, data.custom.arg);
+#else
+		return -ENOTTY;
+#endif
+	/* Deliberately unsupported: libmemion uses -ENOTTY here to select
+	 * the legacy Spreadtrum custom MAP_KERNEL path. */
 	case ION_IOC_VERSION:
-		break;
+		return -ENOTTY;
 	default:
 		return -ENOTTY;
 	}

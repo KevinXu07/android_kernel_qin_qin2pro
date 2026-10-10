@@ -192,6 +192,8 @@ static void *ion_buffer_kmap_get(struct ion_buffer *buffer)
 
 static void ion_buffer_kmap_put(struct ion_buffer *buffer)
 {
+	if (WARN_ON_ONCE(buffer->kmap_cnt <= 0))
+		return;
 	buffer->kmap_cnt--;
 	if (!buffer->kmap_cnt) {
 		buffer->heap->ops->unmap_kernel(buffer->heap, buffer);
@@ -720,6 +722,8 @@ int ion_debug_heap_show_printk(struct ion_heap *heap,
 
 static const struct file_operations ion_fops = {
 	.owner          = THIS_MODULE,
+	.open           = ion_open,
+	.release        = ion_release,
 	.unlocked_ioctl = ion_ioctl,
 #ifdef CONFIG_COMPAT
 	.compat_ioctl	= ion_ioctl,

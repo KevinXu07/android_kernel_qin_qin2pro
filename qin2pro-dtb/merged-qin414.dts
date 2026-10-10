@@ -615,6 +615,13 @@
 					clock-names = "clk_src\0sensor_eb\0clk_96m\0clk_76m8\0clk_48m\0clk_26m";
 					reg = <0x20>;
 					compatible = "sprd,sensor-main";
+					host = "dcam0";
+					port {
+						endpoint {
+							remote-endpoint = <0x301>;
+							phandle = <0x305>;
+						};
+					};
 				};
 			};
 
@@ -646,6 +653,13 @@
 					clock-names = "clk_src\0sensor_eb\0clk_96m\0clk_76m8\0clk_48m\0clk_26m";
 					reg = <0x2a>;
 					compatible = "sprd,sensor-sub2";
+					host = "dcam2";
+					port {
+						endpoint {
+							remote-endpoint = <0x304>;
+							phandle = <0x308>;
+						};
+					};
 				};
 
 				sensor-main2@6C {
@@ -663,6 +677,13 @@
 					clock-names = "clk_src\0sensor_eb\0clk_96m\0clk_76m8\0clk_48m\0clk_26m";
 					reg = <0x6c>;
 					compatible = "sprd,sensor-main2";
+					host = "dcam1";
+					port {
+						endpoint {
+							remote-endpoint = <0x303>;
+							phandle = <0x307>;
+						};
+					};
 				};
 
 				sensor-sub@20 {
@@ -679,6 +700,13 @@
 					clock-names = "clk_src\0sensor_eb\0clk_96m\0clk_76m8\0clk_48m\0clk_26m";
 					reg = <0x20>;
 					compatible = "sprd,sensor-sub";
+					host = "dcam0";
+					port {
+						endpoint {
+							remote-endpoint = <0x302>;
+							phandle = <0x306>;
+						};
+					};
 				};
 
 				flash-ic@63 {
@@ -1939,7 +1967,7 @@
 
 						LDO_VDDCAMD {
 							regulator-name = "vddcamd";
-							regulator-min-microvolt = <0xf5aaa>;
+							regulator-min-microvolt = <0xf4240>;
 							regulator-max-microvolt = <0x16e360>;
 							regulator-ramp-delay = <0x61a8>;
 							phandle = <0xeb>;
@@ -1955,7 +1983,7 @@
 
 						LDO_VDDCAMIO {
 							regulator-name = "vddcamio";
-							regulator-min-microvolt = <0x10e14a>;
+							regulator-min-microvolt = <0x10c8e0>;
 							regulator-max-microvolt = <0x1cfde0>;
 							regulator-ramp-delay = <0x61a8>;
 							phandle = <0xec>;
@@ -2263,15 +2291,23 @@
 				compatible = "sprd,mipi-csi-phy";
 				sprd,phyid = <0x01>;
 				sprd,phyname = "4lane";
-				status = "disabled";
+				sprd,csi = <0x101>;
+				status = "okay";
 				phandle = <0xfb>;
+				port {
+					endpoint {
+						remote-endpoint = <0x305>;
+						phandle = <0x301>;
+					};
+				};
 			};
 
 			mipi-csi-phy2 {
 				compatible = "sprd,mipi-csi-phy";
 				sprd,phyid = <0x02>;
 				sprd,phyname = "2lane";
-				status = "disabled";
+				sprd,csi = <0x103>;
+				status = "okay";
 				phandle = <0xfc>;
 			};
 
@@ -2279,28 +2315,49 @@
 				compatible = "sprd,mipi-csi-phy";
 				sprd,phyid = <0x03>;
 				sprd,phyname = "2p2_m";
-				status = "disabled";
+				sprd,csi = <0x102>;
+				status = "okay";
 				phandle = <0xfd>;
+				port {
+					endpoint {
+						remote-endpoint = <0x307>;
+						phandle = <0x303>;
+					};
+				};
 			};
 
 			mipi-csi-phy0-m {
 				compatible = "sprd,mipi-csi-phy";
 				sprd,phyid = <0x04>;
 				sprd,phyname = "2p2_s";
-				status = "disabled";
+				sprd,csi = <0x101>;
+				status = "okay";
 				phandle = <0xfe>;
+				port {
+					endpoint {
+						remote-endpoint = <0x306>;
+						phandle = <0x302>;
+					};
+				};
 			};
 
 			mipi-csi-phy0-m1 {
 				compatible = "sprd,mipi-csi-phy";
 				sprd,phyid = <0x04>;
 				sprd,phyname = "2p2_s";
-				status = "disabled";
+				sprd,csi = <0x103>;
+				status = "okay";
 				phandle = <0xff>;
+				port {
+					endpoint {
+						remote-endpoint = <0x308>;
+						phandle = <0x304>;
+					};
+				};
 			};
 
 			dcam@60a00000 {
-				compatible = "sprd,sharkl3-cam";
+				compatible = "sprd,dcam";
 				reg = <0x60a00000 0x1000 0x60a01000 0x1000 0x60a02000 0x1000 0x60a03000 0x1000>;
 				reg_name = "dcam0_reg\0dcam1_reg\0dcam2_reg\0axi_ctrl_reg";
 				interrupts = <0x00 0x2d 0x04 0x00 0x9e 0x04 0x00 0x9f 0x04>;
@@ -2309,6 +2366,7 @@
 				syscon-names = "dcam_all_reset\0dcam0_reset\0dcam1_reset\0dcam2_reset";
 				sprd,aon-apb-syscon = <0x02>;
 				sprd,cam-ahb-syscon = <0x4a>;
+				sprd,syscon-pmu-apb = <0x07>;
 				sprd,isp = <0x4b>;
 				sprd,dcam-count = <0x03>;
 				sprd,project-id = <0x00>;
@@ -2338,6 +2396,7 @@
 				interrupts_name = "ch0\0ch1";
 				syscons = <0x4a 0x04 0x80>;
 				syscon-names = "reset";
+				sprd,aon-apb-syscon = <0x02>;
 				sprd,cam-ahb-syscon = <0x4a>;
 				sprd,isp-count = <0x01>;
 				iommus = <0x4f>;
@@ -2412,6 +2471,10 @@
 				interrupts = <0x00 0x7e 0x04>;
 				syscons = <0x41 0x04 0x3c0 0x41 0x04 0x80 0x41 0x04 0x100 0x41 0x04 0x200>;
 				syscon-names = "cpp_rst\0path0_rst\0path1_rst\0dma_rst";
+				sprd,aon-apb-syscon = <0x02>;
+				sprd,cam-ahb-syscon = <0x4a>;
+				sprd,vsp-ahb-syscon = <0x41>;
+				sprd,pmu-apb-syscon = <0x07>;
 				iommus = <0x51>;
 				status = "okay";
 				clock-names = "cpp_eb\0cpp_clk\0cpp_clk_parent\0clk_mm_vsp_eb\0clk_mm_vsp_emc\0clk_mm_vsp_emc_parent";

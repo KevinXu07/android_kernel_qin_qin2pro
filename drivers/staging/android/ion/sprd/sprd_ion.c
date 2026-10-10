@@ -243,12 +243,17 @@ EXPORT_SYMBOL(sprd_ion_get_phys_addr_by_db);
 void *sprd_ion_map_kernel(struct dma_buf *dmabuf, unsigned long offset)
 {
 	void *vaddr;
+	int ret;
 
 	if (!dmabuf)
 		return ERR_PTR(-EINVAL);
 
-	dmabuf->ops->begin_cpu_access(dmabuf, DMA_BIDIRECTIONAL);
+	ret = dma_buf_begin_cpu_access(dmabuf, DMA_BIDIRECTIONAL);
+	if (ret)
+		return ERR_PTR(ret);
 	vaddr = dmabuf->ops->map(dmabuf, offset);
+	if (IS_ERR(vaddr))
+		dma_buf_end_cpu_access(dmabuf, DMA_BIDIRECTIONAL);
 
 	return vaddr;
 }
@@ -265,6 +270,160 @@ int sprd_ion_unmap_kernel(struct dma_buf *dmabuf, unsigned long offset)
 	return 0;
 }
 EXPORT_SYMBOL(sprd_ion_unmap_kernel);
+
+struct sprd_ion_phys32 {
+	__s32 fd_buffer;
+	__u32 phys;
+	__u32 size;
+};
+
+struct sprd_ion_msync32 {
+	__s32 fd_buffer;
+	__u32 vaddr;
+	__u32 paddr;
+	__u32 size;
+};
+
+struct sprd_ion_kmap32 {
+	__s32 fd_buffer;
+	__u64 kaddr;
+	__u32 size;
+};
+
+/* The stock camera passes the returned kernel address back to ISP ioctls.
+ * The dma-buf fd retains the allocation until the matching UNMAP_KERNEL. */
+long sprd_ion_custom_ioctl(unsigned int cmd, unsigned long arg)
+{
+	void __user *arg_user = (void __user *)arg;
+	struct dma_buf *dmabuf;
+	int fd, ret = 0;
+
+	switch (cmd) {
+	case ION_SPRD_CUSTOM_PHYS:
+	case ION_SPRD_CUSTOM_MSYNC:
+	case ION_SPRD_CUSTOM_MAP_KERNEL:
+	case ION_SPRD_CUSTOM_UNMAP_KERNEL:
+		if (get_user(fd, (int __user *)arg_user))
+			return -EFAULT;
+		break;
+	case ION_SPRD_CUSTOM_INVALIDATE:
+		/* This command carries the fd itself rather than a pointer. */
+		fd = (int)arg;
+		break;
+	default:
+		return -ENOTTY;
+	}
+	dmabuf = dma_buf_get(fd);
+	if (IS_ERR(dmabuf))
+		return PTR_ERR(dmabuf);
+	if (strcmp(dmabuf->exp_name, "ion") || !dmabuf->priv) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	switch (cmd) {
+	case ION_SPRD_CUSTOM_MAP_KERNEL: {
+		struct ion_kmap_data data = { .fd_buffer = fd };
+		void *kaddr;
+
+		kaddr = sprd_ion_map_kernel(dmabuf, 0);
+		if (IS_ERR(kaddr)) {
+			ret = PTR_ERR(kaddr);
+			break;
+		}
+		data.kaddr = (uint64_t)kaddr;
+		data.size = dmabuf->size;
+		if (is_compat_task()) {
+			struct sprd_ion_kmap32 data32 = {
+				.fd_buffer = fd,
+				.kaddr = data.kaddr,
+				.size = data.size,
+			};
+
+			ret = copy_to_user(arg_user, &data32, sizeof(data32));
+		} else {
+			ret = copy_to_user(arg_user, &data, sizeof(data));
+		}
+		if (ret) {
+			sprd_ion_unmap_kernel(dmabuf, 0);
+			ret = -EFAULT;
+		}
+		break;
+	}
+	case ION_SPRD_CUSTOM_UNMAP_KERNEL: {
+		struct ion_buffer *buffer = dmabuf->priv;
+
+		if (!READ_ONCE(buffer->kmap_cnt))
+			ret = -EINVAL;
+		else
+			ret = sprd_ion_unmap_kernel(dmabuf, 0);
+		break;
+	}
+	case ION_SPRD_CUSTOM_PHYS: {
+		struct ion_phys_data data = { .fd_buffer = fd };
+
+		ret = sprd_ion_get_phys_addr(-1, dmabuf,
+					     &data.phys, &data.size);
+		if (ret)
+			break;
+		if (is_compat_task()) {
+			struct sprd_ion_phys32 data32 = {
+				.fd_buffer = fd,
+				.phys = data.phys,
+				.size = data.size,
+			};
+
+			ret = copy_to_user(arg_user, &data32, sizeof(data32));
+		} else {
+			ret = copy_to_user(arg_user, &data, sizeof(data));
+		}
+		ret = ret ? -EFAULT : 0;
+		break;
+	}
+	case ION_SPRD_CUSTOM_MSYNC: {
+		struct ion_msync_data data;
+		void *kaddr;
+
+		if (is_compat_task()) {
+			struct sprd_ion_msync32 data32;
+
+			if (copy_from_user(&data32, arg_user, sizeof(data32))) {
+				ret = -EFAULT;
+				break;
+			}
+			data.size = data32.size;
+		} else if (copy_from_user(&data, arg_user, sizeof(data))) {
+			ret = -EFAULT;
+			break;
+		}
+		if (!data.size || data.size > dmabuf->size) {
+			ret = -EINVAL;
+			break;
+		}
+		/* Sync the entire owned buffer through a kernel mapping. Never
+		 * execute cache operations on an unchecked userspace address. */
+		kaddr = sprd_ion_map_kernel(dmabuf, 0);
+		if (IS_ERR(kaddr)) {
+			ret = PTR_ERR(kaddr);
+			break;
+		}
+#ifdef CONFIG_ARM64
+		__dma_flush_area(kaddr, dmabuf->size);
+#elif defined(CONFIG_ARM)
+		dmac_flush_range(kaddr, kaddr + dmabuf->size);
+#endif
+		ret = sprd_ion_unmap_kernel(dmabuf, 0);
+		break;
+	}
+	case ION_SPRD_CUSTOM_INVALIDATE:
+		ret = dma_buf_begin_cpu_access(dmabuf, DMA_FROM_DEVICE);
+		break;
+	}
+out:
+	dma_buf_put(dmabuf);
+	return ret;
+}
+EXPORT_SYMBOL(sprd_ion_custom_ioctl);
 
 static struct ion_platform_heap *sprd_ion_parse_dt(struct platform_device *pdev)
 {
@@ -491,3 +650,20 @@ static void __exit sprd_ion_exit(void)
 }
 
 subsys_initcall(sprd_ion_init);
+
+int sprd_ion_check_phys_addr(struct dma_buf *dmabuf)
+{
+	struct ion_buffer *buffer;
+	struct sg_table *table = NULL;
+
+	if (!dmabuf || !dmabuf->priv)
+		return -EINVAL;
+
+	buffer = dmabuf->priv;
+	table = buffer->sg_table;
+	if (!table || !table->sgl)
+		return -EINVAL;
+
+	return 0;
+}
+EXPORT_SYMBOL(sprd_ion_check_phys_addr);

@@ -35,6 +35,13 @@ enum sprd_ion_heap_ids {
 #define ION_FLAG_SECURE  (1<<31)
 #define ION_FLAG_NO_CLEAR (1 << 16)
 
+/* Legacy Spreadtrum ION custom commands used by the camera HAL. */
+#define ION_SPRD_CUSTOM_PHYS          0
+#define ION_SPRD_CUSTOM_MSYNC         1
+#define ION_SPRD_CUSTOM_MAP_KERNEL    5
+#define ION_SPRD_CUSTOM_UNMAP_KERNEL  6
+#define ION_SPRD_CUSTOM_INVALIDATE    7
+
 
 enum SPRD_DEVICE_SYNC_TYPE {
 	SPRD_DEVICE_PRIMARY_SYNC,
