@@ -2049,8 +2049,12 @@ static int sprd_camioctl_camera_raw_pipeline_cfg(struct camera_file *camerafile)
 
 		/* The HAL supplies preview buffers after STREAM_ON. ISP still
 		 * needs a valid reserved address while the path is brought up. */
-		sprd_cam_buf_alloc(&cam_addr.buf_info, camerafile->idx,
-			&s_dcam_pdev->dev, size, 1, CAM_BUF_SWAP_TYPE);
+		ret = sprd_cam_buf_alloc(&cam_addr.buf_info, camerafile->idx,
+			&s_dcam_pdev->dev, size, 1, CAM_BUF_KERNEL_TYPE);
+		if (ret)
+			return ret;
+		cam_addr.uaddr = path_pre->out_size.w * path_pre->out_size.h;
+		cam_addr.vaddr = cam_addr.uaddr + cam_addr.uaddr / 4;
 		path_pre->frm_reserved_addr = cam_addr;
 	}
 
@@ -2678,8 +2682,13 @@ static int sprd_camioctl_isp_path_block_cfg(struct camera_path_spec *path,
 
 		pr_info("allocating missing ISP reserved buffer %ux%u\n",
 			path->out_size.w, path->out_size.h);
-		sprd_cam_buf_alloc(&cam_addr.buf_info, dev->idx,
-			&s_dcam_pdev->dev, size, 1, CAM_BUF_SWAP_TYPE);
+		/* This buffer is an ISP output, not a DCAM/ISP exchange. */
+		ret = sprd_cam_buf_alloc(&cam_addr.buf_info, dev->idx,
+			&s_dcam_pdev->dev, size, 1, CAM_BUF_KERNEL_TYPE);
+		if (ret)
+			goto exit;
+		cam_addr.uaddr = path->out_size.w * path->out_size.h;
+		cam_addr.vaddr = cam_addr.uaddr + cam_addr.uaddr / 4;
 		path->frm_reserved_addr = cam_addr;
 	}
 
