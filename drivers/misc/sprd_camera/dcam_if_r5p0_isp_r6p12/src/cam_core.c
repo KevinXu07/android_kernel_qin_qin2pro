@@ -574,7 +574,8 @@ static int sprd_camcore_release(struct inode *node, struct file *file)
 			}
 			if (group->dev_inited & (1 << i))
 				complete(&dev->irq_com);
-			sprd_camioctl_io_stream_off(camerafile, dev, 0);
+			sprd_camioctl_io_stream_off(camerafile, dev, 0,
+				SPRD_IMG_IO_STREAM_OFF);
 			if (i < ISP_MAX_COUNT)
 				sprd_isp_drv_module_dis(dev->isp_dev_handle);
 			sprd_dcam_drv_module_dis(i);
@@ -627,7 +628,7 @@ static long sprd_camcore_ioctl(struct file *file, uint32_t cmd,
 
 	io_ctrl = sprd_camioctl_get_fun(cmd);
 	if (io_ctrl != NULL) {
-		ret = io_ctrl(camerafile, dev, arg);
+		ret = io_ctrl(camerafile, dev, arg, cmd);
 		if (ret) {
 			pr_err("fail to cmd %d\n", _IOC_NR(cmd));
 			goto exit;
