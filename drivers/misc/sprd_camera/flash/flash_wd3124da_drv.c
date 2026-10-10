@@ -295,8 +295,15 @@ static int sprd_flash_wd3124da_probe(struct platform_device *pdev)
 	ret = of_property_read_u32(pdev->dev.of_node,
 						"flash-ic", &gpio_node);
 	if (ret) {
-		pr_err("no gpio flash\n");
-		return -ENODEV;
+		const char *flash_ic;
+
+		/* Qin stock DT uses a string; other boards use a u32. */
+		ret = of_property_read_string(pdev->dev.of_node,
+						"flash-ic", &flash_ic);
+		if (ret || !flash_ic || !*flash_ic) {
+			pr_err("no flash-ic property\n");
+			return -ENODEV;
+		}
 	}
 
 	drv_data = devm_kzalloc(&pdev->dev, sizeof(*drv_data), GFP_KERNEL);
