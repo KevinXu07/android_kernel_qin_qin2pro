@@ -365,13 +365,13 @@ static int sprd_sensor_io_write_i2c_regs(struct sprd_sensor_file_tag *p_file,
 }
 
 static int sprd_sensor_io_if_cfg(struct sprd_sensor_file_tag *p_file,
-				 unsigned long arg)
+				 unsigned long arg, size_t arg_size)
 {
 	int ret = 0;
-	struct sensor_if_cfg_tag if_cfg;
+	struct sensor_if_cfg_tag if_cfg = {0};
 
-	ret = copy_from_user((void *)&if_cfg, (struct sensor_if_cfg_tag *)arg,
-			     sizeof(if_cfg));
+	/* The legacy prefix is identical; leave new C-PHY fields zero. */
+	ret = copy_from_user(&if_cfg, (void __user *)arg, arg_size);
 	if (ret)
 		return ret;
 
@@ -395,13 +395,13 @@ static int sprd_sensor_io_if_cfg(struct sprd_sensor_file_tag *p_file,
 }
 
 static int sprd_sensor_io_if_switch(struct sprd_sensor_file_tag *p_file,
-				 unsigned long arg)
+				 unsigned long arg, size_t arg_size)
 {
 	int ret = 0;
-	struct sensor_if_cfg_tag if_cfg;
+	struct sensor_if_cfg_tag if_cfg = {0};
 
-	ret = copy_from_user((void *)&if_cfg, (struct sensor_if_cfg_tag *)arg,
-			     sizeof(if_cfg));
+	/* The legacy prefix is identical; leave new C-PHY fields zero. */
+	ret = copy_from_user(&if_cfg, (void __user *)arg, arg_size);
 	if (ret)
 		return -EFAULT;
 
@@ -538,10 +538,12 @@ static long sprd_sensor_file_ioctl(struct file *file, unsigned int cmd,
 		ret = sprd_sensor_io_write_i2c_regs(p_file, arg);
 		break;
 	case SENSOR_IO_IF_CFG:
-		ret = sprd_sensor_io_if_cfg(p_file, arg);
+	case SENSOR_IO_IF_CFG_LEGACY:
+		ret = sprd_sensor_io_if_cfg(p_file, arg, _IOC_SIZE(cmd));
 		break;
 	case SENSOR_IO_IF_SWITCH:
-		ret = sprd_sensor_io_if_switch(p_file, arg);
+	case SENSOR_IO_IF_SWITCH_LEGACY:
+		ret = sprd_sensor_io_if_switch(p_file, arg, _IOC_SIZE(cmd));
 		break;
 	case SENSOR_IO_GRC_I2C_WRITE:
 		ret = sprd_sensor_io_grc_write_i2c(p_file, arg);

@@ -62,6 +62,15 @@ enum INTERFACE_TYPE_ID {
 	INTERFACE_MIPI
 };
 
+/* P-era sensor HALs pass the five-word interface configuration. */
+struct sensor_if_cfg_legacy_tag {
+	uint32_t is_open;
+	uint32_t if_type;
+	uint32_t phy_id;
+	uint32_t lane_num;
+	uint32_t bps_per_lane;
+};
+
 struct sensor_if_cfg_tag {
 	uint32_t is_open;
 	uint32_t if_type;
@@ -180,6 +189,8 @@ struct sensor_muti_aec_i2c_tag {
 	_IOWR(SENSOR_IOC_MAGIC, 17, struct sensor_flash_level)
 #define SENSOR_IO_IF_CFG	\
 	_IOW(SENSOR_IOC_MAGIC,  18, struct sensor_if_cfg_tag)
+#define SENSOR_IO_IF_CFG_LEGACY	\
+	_IOW(SENSOR_IOC_MAGIC,  18, struct sensor_if_cfg_legacy_tag)
 #define SENSOR_IO_GRC_I2C_WRITE	\
 	_IOW(SENSOR_IOC_MAGIC,  19, struct sensor_i2c_tag)
 #define SENSOR_IO_GRC_I2C_READ	\
@@ -192,6 +203,8 @@ struct sensor_muti_aec_i2c_tag {
 	_IOW(SENSOR_IOC_MAGIC,  23, struct sensor_muti_aec_i2c_tag)
 #define SENSOR_IO_IF_SWITCH            \
 	_IOW(SENSOR_IOC_MAGIC,  24, struct sensor_if_cfg_tag)
+#define SENSOR_IO_IF_SWITCH_LEGACY	\
+	_IOW(SENSOR_IOC_MAGIC,  24, struct sensor_if_cfg_legacy_tag)
 #define SENSOR_IO_PRI_KEY	\
 	_IOW(SENSOR_IOC_MAGIC, 	25, uint32_t)
 #define SENSOR_IO_READ_OTPDATA	\
