@@ -193,6 +193,23 @@ fan54015_charger_set_termina_vol(struct fan54015_charger_info *info, u32 vol)
 				    reg_val << FAN54015_REG_TERMINAL_VOLTAGE_SHIFT);
 }
 
+static int
+fan54015_charger_get_termina_vol(struct fan54015_charger_info *info, u32 *vol)
+{
+	u8 reg_val;
+	int ret;
+
+	ret = fan54015_read(info, FAN54015_REG_2, &reg_val);
+	if (ret < 0)
+		return ret;
+
+	reg_val = (reg_val & FAN54015_REG_TERMINAL_VOLTAGE_MASK) >>
+		  FAN54015_REG_TERMINAL_VOLTAGE_SHIFT;
+	*vol = reg_val * 20 + 3500;
+
+	return 0;
+}
+
 
 static int
 fan54015_charger_set_safety_cur(struct fan54015_charger_info *info, u32 cur)
@@ -598,7 +615,7 @@ static int fan54015_charger_usb_get_property(struct power_supply *psy,
 					     union power_supply_propval *val)
 {
 	struct fan54015_charger_info *info = power_supply_get_drvdata(psy);
-	u32 cur, online, health;
+	u32 cur, online, health, vol;
 	enum usb_charger_type type;
 	int ret = 0;
 
@@ -634,6 +651,14 @@ static int fan54015_charger_usb_get_property(struct power_supply *psy,
 
 			val->intval = cur;
 		}
+		break;
+
+	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_VOLTAGE_MAX:
+		ret = fan54015_charger_get_termina_vol(info, &vol);
+		if (ret)
+			goto out;
+
+		val->intval = vol * 1000;
 		break;
 
 	case POWER_SUPPLY_PROP_ONLINE:
@@ -769,6 +794,7 @@ static enum power_supply_property fan54015_usb_props[] = {
 	POWER_SUPPLY_PROP_STATUS,
 	POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT,
 	POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT,
+	POWER_SUPPLY_PROP_CONSTANT_CHARGE_VOLTAGE_MAX,
 	POWER_SUPPLY_PROP_ONLINE,
 	POWER_SUPPLY_PROP_HEALTH,
 	POWER_SUPPLY_PROP_USB_TYPE,

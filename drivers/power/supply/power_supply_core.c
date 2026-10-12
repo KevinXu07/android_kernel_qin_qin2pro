@@ -653,7 +653,13 @@ int power_supply_get_battery_info(struct power_supply *psy,
 //	of_property_read_u32(battery_np, "charge-full-design-microamp-hours",
 //			     &info->charge_full_design_uah);
 	propname = kasprintf(GFP_KERNEL, "charge-full-design-microamp-hours-%d", battery_id);
-	of_property_read_u32(battery_np, propname,&info->charge_full_design_uah);
+	err = of_property_read_u32(battery_np, propname, &info->charge_full_design_uah);
+	if (err) {
+		/* Older Qin2Pro DTs expose the standard unnumbered property. */
+		err = of_property_read_u32(battery_np,
+				    "charge-full-design-microamp-hours",
+				    &info->charge_full_design_uah);
+	}
 	dev_err(&psy->dev, "%s ;%dmAh;\n", __func__,info->charge_full_design_uah/1000);
 	of_property_read_u32(battery_np, "voltage-min-design-microvolt",
 			     &info->voltage_min_design_uv);
